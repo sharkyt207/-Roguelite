@@ -133,10 +133,25 @@ tap&drag ist die *nativste* Touch-Interaktion überhaupt; die Bauphase ist pausi
 - Kampf: minimalistisches HUD (HP, Overcharge-Ring, Wellen-Fortschritt, Timer).
 - Farbcode für Seltenheit & Element; Synergie-Linien statt Text; Icons > Wörter.
 
-## 11. Art & Audio (Richtung offen — siehe Entscheidung 2)
+## 10a. Fiktion & Welt — „Salvage-Mech" (beschlossen)
 
-Richtungsvorschläge werden mit der Fiktions-Entscheidung festgelegt. Prinzipien:
-klare Silhouetten, hoher Kontrast (kleine Displays), performant auf Mittelklasse.
+Du bist ein **erwachter Reaktor-Kern** in einer toten Industriewelt, die von einem
+Phänomen namens **„der Rückbau" (The Reclaim)** verschlungen wurde – Maschinen und
+Landschaft werden zu wanderndem Schrott. Du überlebst, indem du aus Salvage eine
+**Kampfmaschine auf einem Chassis-Gitter** zusammensetzt. **Der Grid ist dein Körper.**
+
+- **Warum das trägt:** begründet den Grid diegetisch (Chassis), Loot = Salvage (1:1),
+  Elemente = geborgene Waffentech, klare lesbare Silhouetten für kleine Displays.
+- **Gegner:** „Reclaimed" – Scraplings (Rusher), Husks (Grunt), Haulers (Tank);
+  Sektor-Boss **„Reclaimer"** (bergender Groß-Automat).
+- **Ton:** industriell, karg, melancholisch-hoffnungsvoll (Kern erwacht in Ruinen).
+
+## 11. Art & Audio (Richtung: Salvage-Mech)
+
+- **Art:** dunkler Industrie-Look, gebürstetes Metall-Grau, Warnlicht-Amber als Akzent,
+  Teal für Reaktor-Energie. Elementfarben hochkontrastig & distinkt (Ember/Frost/Volt/Kinetic).
+  Programmatische Vektor-/Primitiv-Grafik im Prototyp (keine Assets nötig, DPR-scharf).
+- **Audio (später):** metallische Impacts, tiefes Reaktor-Brummen, körniges Ambiente.
 
 ## 12. Monetarisierung (Analyse-basiert, fair)
 
@@ -149,10 +164,26 @@ klare Silhouetten, hoher Kontrast (kleine Displays), performant auf Mittelklasse
 - Daily Run (fester Seed + Modifier), wöchentliche Mutatoren, Saison-Ascension.
 - Roadmap-Phasen: Prototyp → Vertical Slice → Content-Ausbau → Soft-Launch.
 
-## 14. Technische Architektur (offen — siehe Entscheidung 3)
+## 14. Technische Architektur (Stack: Web/TypeScript — beschlossen)
 
-Wird mit der Stack-Entscheidung festgelegt (Datenmodell für Komponenten/Adjazenz,
-deterministischer RNG für Daily-Seeds, Save-System, Performance-Budget).
+- **Stack:** TypeScript + reines **Canvas 2D** (keine Runtime-Dependencies), Bundling via
+  **Vite**, Single-File-Build (`vite-plugin-singlefile`) → per Link auf dem Handy spielbar.
+- **Struktur (modular):**
+  - `core/` — Viewport/DPR, Input (Multitouch), seedbarer RNG, Theme/Palette.
+  - `game/` — `Game` (State-Machine + Loop), `components` (Katalog), `grid` (Modell +
+    Power-Flood-Fill + Synergie-Auflösung), `enemies`, `run` (Run-/Wellen-State), `scenes/`.
+  - `ui/` — Zeichen-Helfer + programmatische Komponenten-Icons.
+- **Determinismus:** mulberry32-RNG mit Seed → Grundlage für spätere Daily Runs & Balancing-Tests.
+- **Performance-Budget:** feste dt-Klammerung, Objekt-Filter statt Alloc-Spikes, DPR ≤ 3.
+- **Deployment:** GitHub-Actions-Workflow baut & published nach GitHub Pages.
+- **Portierung:** bei Bedarf später Godot/Unity; Datenmodell (Komponenten/Adjazenz) ist
+  engine-unabhängig gehalten.
+
+## Prototyp-Status (v0.1 — lauffähig)
+
+Spielbarer Vertical Slice: Title → Build (tap&drag, Power/Synergie live) → Combat
+(Floating-Joystick, Auto-Feuer, 4 Elemente, Overcharge) → Reward-Draft (3-aus-N + Reroll)
+→ 5 Wellen inkl. Boss → Sieg/Niederlage. 5 Waffen, 5 Support/Kern/Conduit-Teile.
 
 ---
 
