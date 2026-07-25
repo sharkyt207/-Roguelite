@@ -1,19 +1,19 @@
 /**
  * Run state — everything that persists across the build/combat/reward loop of a
- * single run. Reset when a new run begins.
+ * single run. Built from the selected chassis and the player's meta upgrades.
  */
 
 import { Grid } from "./grid";
+import { CHASSIS } from "./chassis";
+import type { MetaSave } from "./meta";
 
 export interface WaveDef {
-  duration: number; // seconds
-  /** Enemy spawn table: [enemyId, per-second rate]. */
+  duration: number;
   spawns: Array<[string, number]>;
   boss?: string;
   label: string;
 }
 
-/** Vertical-slice wave progression (3 sectors compressed into 5 waves). */
 export const WAVES: WaveDef[] = [
   { duration: 30, label: "Sector 1 · Wave 1", spawns: [["rusher", 1.1]] },
   { duration: 34, label: "Sector 1 · Wave 2", spawns: [["rusher", 1.3], ["grunt", 0.4]] },
@@ -37,27 +37,24 @@ export class RunState {
   maxHp: number;
   salvage: number;
   waveIndex: number;
-  /** Drafted components not yet placed on the grid. */
   inventory: string[];
+  chassisId: string;
 
-  constructor() {
-    this.grid = new Grid(5, 5, [
-      // A few starter-locked cells (unlockable via meta later).
-      [0, 0],
-      [4, 0],
-      [0, 4],
-      [4, 4],
-    ]);
-    this.maxHp = 100;
-    this.hp = 100;
-    this.salvage = 0;
+  constructor(meta: MetaSave) {
+    const chassis = CHASSIS[meta.selectedChassis] ?? CHASSIS.scrapheap;
+    this.chassisId = chassis.id;
+
+    // Expanded-Chassis upgrade unlocks the first N locked cells.
+    const locked = chassis.locked.slice(meta.upgrades.reactor);
+    this.grid = new Grid(chassis.cols, chassis.rows, locked, chassis.mods);
+
+    this.maxHp = chassis.baseHp + meta.upgrades.hull * 25;
+    this.hp = this.maxHp;
+    this.salvage = meta.upgrades.magnet * 2;
     this.waveIndex = 0;
-    this.inventory = [];
+    this.inventory = [...chassis.startInventory];
 
-    // Starter kit: a core + first weapon placed, plus pieces to teach placement.
-    this.grid.place(2, 2, "reactor_core");
-    this.grid.place(2, 1, "rivet_gun");
-    this.inventory.push("flak_pod", "ember_cell", "conduit");
+    for (const [x, y, id] of chassis.start) this.grid.place(x, y, id);
   }
 
   get isLastWave(): boolean {

@@ -132,6 +132,7 @@ export class BuildScene implements Scene {
 
     if (target && run.grid.canPlace(target.x, target.y)) {
       run.grid.place(target.x, target.y, d.defId);
+      this.game.audio.play("place");
     } else if (pointInRect(d.x, d.y, this.trayZone)) {
       run.inventory.push(d.defId);
     } else if (d.origin.type === "cell" && run.grid.canPlace(d.origin.x, d.origin.y)) {

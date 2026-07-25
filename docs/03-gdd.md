@@ -179,11 +179,23 @@ Landschaft werden zu wanderndem Schrott. Du überlebst, indem du aus Salvage ein
 - **Portierung:** bei Bedarf später Godot/Unity; Datenmodell (Komponenten/Adjazenz) ist
   engine-unabhängig gehalten.
 
-## Prototyp-Status (v0.1 — lauffähig)
+## Prototyp-Status (v0.2 — lauffähig)
 
-Spielbarer Vertical Slice: Title → Build (tap&drag, Power/Synergie live) → Combat
+Spielbarer Loop: Title → Build (tap&drag, Power/Synergie live) → Combat
 (Floating-Joystick, Auto-Feuer, 4 Elemente, Overcharge) → Reward-Draft (3-aus-N + Reroll)
-→ 5 Wellen inkl. Boss → Sieg/Niederlage. 5 Waffen, 5 Support/Kern/Conduit-Teile.
+→ 5 Wellen inkl. Boss → End → Workshop.
+
+**Block A – Build-Tiefe:** Crit-System, Spread/Radial-Waffen, Zwei-Pass-Synergie
+(Resonator verstärkt benachbarte Supports), Line-Sets (3+ Waffen in Reihe/Spalte = Array-Bonus),
+Element-Reaktionen (Chilled = +35% Schaden; Volt auf Brennenden = Detonation).
+Neue Teile: Resonator, Catalyst, Splitter, Rail Lance (teils Blueprint-gated).
+
+**Block B – Meta-Progression:** Persistenter Speicher (localStorage), Cores-Währung,
+Workshop mit Upgrades (Hull/Chassis-Zellen/Salvage-Magnet), 3 Chassis (Scrapheap/Lattice/
+Bulwark mit eigenen Grids & Mods), Blueprint-Freischaltungen, Statistiken.
+
+**Block C – Feel & Juice:** Screenshake, schwebende Schadenszahlen (Crits hervorgehoben),
+Treffer-Flash, Partikel, sowie ein assetfreier Web-Audio-Synth für SFX (mit Mute-Toggle).
 
 ---
 

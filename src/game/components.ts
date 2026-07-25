@@ -7,7 +7,11 @@
  *  - core    : a power source; powers its 4 neighbours.
  *  - conduit : when powered, extends power to its neighbours (routing puzzle).
  *
- * Adjacency + power routing is what turns "an inventory" into "a spatial puzzle".
+ * Build depth (Block A) comes from three stacking layers:
+ *  1. Support → weapon adjacency (element injection, damage, fire rate, crit).
+ *  2. Support → support amplification (Resonator boosts adjacent supports).
+ *  3. Line sets (3+ weapons in a powered row/column gain an Array bonus) and
+ *     elemental reactions resolved in combat (chill amplifies, burn+volt detonates).
  */
 
 import type { ElementId, Rarity } from "../core/theme";
@@ -21,14 +25,18 @@ export interface WeaponStats {
   /** Targeting range in px. */
   range: number;
   projectileSpeed: number;
-  /** Projectiles per shot (spread). */
+  /** Projectiles per shot. */
   projectiles: number;
+  /** Total spread angle in radians across the projectiles. */
+  spread: number;
   /** Volt chain jumps. */
   chain: number;
   /** Splash radius (0 = single target). */
   aoe: number;
   /** Projectile pierces this many enemies. */
   pierce: number;
+  /** Crit chance (0..1); crits deal 2x. */
+  crit: number;
 }
 
 export interface SupportMods {
@@ -42,6 +50,10 @@ export interface SupportMods {
   slow?: number;
   /** Range added in px. */
   rangeAdd?: number;
+  /** Crit chance added to adjacent weapons. */
+  critAdd?: number;
+  /** Multiplies the numeric effects of ADJACENT supports (support-of-support). */
+  supportBoost?: number;
 }
 
 export interface ComponentDef {
@@ -55,6 +67,8 @@ export interface ComponentDef {
   support?: SupportMods;
   /** Weight in the reward draft pool (higher = more common). */
   weight: number;
+  /** If true, must be unlocked in the Workshop before appearing in the pool. */
+  blueprint?: boolean;
 }
 
 const W = (s: Partial<WeaponStats>): WeaponStats => ({
@@ -63,9 +77,11 @@ const W = (s: Partial<WeaponStats>): WeaponStats => ({
   range: 260,
   projectileSpeed: 520,
   projectiles: 1,
+  spread: 0,
   chain: 0,
   aoe: 0,
   pierce: 0,
+  crit: 0.05,
   ...s,
 });
 
@@ -108,7 +124,7 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     rarity: "common",
     element: "kinetic",
     desc: "Short-range spread of 4 pellets. Great against swarms.",
-    weapon: W({ damage: 4, fireRate: 1.6, range: 170, projectiles: 4, projectileSpeed: 440 }),
+    weapon: W({ damage: 4, fireRate: 1.6, range: 170, projectiles: 4, spread: 0.42, projectileSpeed: 440 }),
     weight: 5,
   },
   arc_coil: {
@@ -138,8 +154,20 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     rarity: "rare",
     element: "kinetic",
     desc: "Long-range piercing shot that punches through a line of enemies.",
-    weapon: W({ damage: 24, fireRate: 0.9, range: 460, pierce: 4, projectileSpeed: 980 }),
+    weapon: W({ damage: 24, fireRate: 0.9, range: 460, pierce: 4, crit: 0.12, projectileSpeed: 980 }),
     weight: 2,
+    blueprint: true,
+  },
+  splitter: {
+    id: "splitter",
+    name: "Splitter",
+    category: "weapon",
+    rarity: "rare",
+    element: "frost",
+    desc: "Fires a full radial burst of 6 shards in all directions.",
+    weapon: W({ damage: 5, fireRate: 1.3, range: 220, projectiles: 6, spread: Math.PI * 2, projectileSpeed: 420 }),
+    weight: 2,
+    blueprint: true,
   },
 
   // ---- Support ---------------------------------------------------------
@@ -159,7 +187,7 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     category: "support",
     rarity: "common",
     element: "frost",
-    desc: "Adjacent weapons chill enemies, slowing them.",
+    desc: "Adjacent weapons chill enemies, slowing them. Chilled enemies take +35% damage.",
     support: { injectElement: "frost", slow: 0.45 },
     weight: 5,
   },
@@ -179,9 +207,19 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     category: "support",
     rarity: "uncommon",
     element: "kinetic",
-    desc: "Adjacent weapons fire 50% faster.",
-    support: { fireRateMult: 1.5 },
+    desc: "Adjacent weapons fire 50% faster and gain +8% crit.",
+    support: { fireRateMult: 1.5, critAdd: 0.08 },
     weight: 4,
+  },
+  resonator: {
+    id: "resonator",
+    name: "Resonator",
+    category: "support",
+    rarity: "rare",
+    element: "volt",
+    desc: "Boosts the effect of ADJACENT support components by 60%.",
+    support: { supportBoost: 1.6 },
+    weight: 3,
   },
   overclocker: {
     id: "overclocker",
@@ -192,10 +230,30 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     desc: "Adjacent weapons: +30% damage and +30% fire rate.",
     support: { damageMult: 1.3, fireRateMult: 1.3 },
     weight: 2,
+    blueprint: true,
+  },
+  catalyst: {
+    id: "catalyst",
+    name: "Catalyst",
+    category: "support",
+    rarity: "rare",
+    element: "ember",
+    desc: "Adjacent weapons gain +20% crit.",
+    support: { critAdd: 0.2 },
+    weight: 2,
+    blueprint: true,
   },
 };
 
 export const COMPONENT_LIST = Object.values(COMPONENTS);
 
-/** The draftable pool (everything except the guaranteed starter core). */
-export const DRAFT_POOL = COMPONENT_LIST.filter((c) => c.id !== "reactor_core");
+/**
+ * The draftable pool for a run: everything except the guaranteed starter core
+ * and any blueprint not yet unlocked in the Workshop.
+ */
+export function draftPool(unlockedBlueprints: string[]): ComponentDef[] {
+  const unlocked = new Set(unlockedBlueprints);
+  return COMPONENT_LIST.filter(
+    (c) => c.id !== "reactor_core" && (!c.blueprint || unlocked.has(c.id)),
+  );
+}

@@ -1,11 +1,13 @@
 /**
  * The Forge grid — model + synergy resolution.
  *
- * The grid stores placed components. Two derived computations drive everything:
+ * Derived computations:
  *   1. Power flood-fill: which cells are powered (reachable from a Core through
  *      Cores/Conduits).
- *   2. Weapon resolution: each powered weapon's final stats after applying the
- *      support components orthogonally adjacent to it.
+ *   2. Support potency (pass 1): each support's numeric effect is boosted by
+ *      adjacent Resonators (support-of-support).
+ *   3. Weapon resolution (pass 2): each powered weapon's final stats after
+ *      applying adjacent supports, line-set bonuses and chassis modifiers.
  */
 
 import { COMPONENTS, type ComponentDef } from "./components";
@@ -15,8 +17,13 @@ export interface Cell {
   x: number;
   y: number;
   locked: boolean;
-  /** Component def id, or undefined if empty. */
   comp?: string;
+}
+
+export interface ChassisMods {
+  damageMult?: number;
+  fireRateMult?: number;
+  rangeAdd?: number;
 }
 
 export interface ResolvedWeapon {
@@ -29,9 +36,11 @@ export interface ResolvedWeapon {
   range: number;
   projectileSpeed: number;
   projectiles: number;
+  spread: number;
   chain: number;
   aoe: number;
   pierce: number;
+  crit: number;
   burn: number;
   slow: number;
 }
@@ -47,10 +56,17 @@ export class Grid {
   readonly cols: number;
   readonly rows: number;
   readonly cells: Cell[];
+  mods: ChassisMods;
 
-  constructor(cols: number, rows: number, lockedCells: Array<[number, number]> = []) {
+  constructor(
+    cols: number,
+    rows: number,
+    lockedCells: Array<[number, number]> = [],
+    mods: ChassisMods = {},
+  ) {
     this.cols = cols;
     this.rows = rows;
+    this.mods = mods;
     this.cells = [];
     const lockedSet = new Set(lockedCells.map(([x, y]) => `${x},${y}`));
     for (let y = 0; y < rows; y++) {
@@ -97,16 +113,12 @@ export class Grid {
   computePowered(): Set<string> {
     const powered = new Set<string>();
     const frontier: Cell[] = [];
-
-    // Seed with cores.
     for (const c of this.cells) {
       if (this.def(c)?.category === "core") {
         powered.add(`${c.x},${c.y}`);
         frontier.push(c);
       }
     }
-
-    // Flood: cores and powered conduits emit to neighbours.
     while (frontier.length) {
       const cur = frontier.pop()!;
       for (const [dx, dy] of DIRS) {
@@ -122,13 +134,33 @@ export class Grid {
     return powered;
   }
 
-  /** Resolve every powered weapon's final stats (applies adjacent supports). */
+  /** Pass 1: each powered support's potency multiplier (Resonator boosts). */
+  private supportPotency(powered: Set<string>): Map<string, number> {
+    const pot = new Map<string, number>();
+    for (const c of this.cells) {
+      const d = this.def(c);
+      if (!d?.support || !powered.has(`${c.x},${c.y}`)) continue;
+      let boost = 1;
+      for (const [dx, dy] of DIRS) {
+        const n = this.at(c.x + dx, c.y + dy);
+        if (!n || !powered.has(`${n.x},${n.y}`)) continue;
+        const sb = this.def(n)?.support?.supportBoost;
+        if (sb) boost *= sb;
+      }
+      pot.set(`${c.x},${c.y}`, boost);
+    }
+    return pot;
+  }
+
+  /** Resolve every powered weapon's final stats. */
   resolveWeapons(powered = this.computePowered()): ResolvedWeapon[] {
+    const pot = this.supportPotency(powered);
     const out: ResolvedWeapon[] = [];
+
     for (const c of this.cells) {
       const d = this.def(c);
       if (!d?.weapon) continue;
-      if (!powered.has(`${c.x},${c.y}`)) continue; // unpowered weapons don't fire
+      if (!powered.has(`${c.x},${c.y}`)) continue;
 
       let damageMult = 1;
       let fireRateMult = 1;
@@ -136,53 +168,79 @@ export class Grid {
       let burn = 0;
       let slow = 0;
       let rangeAdd = 0;
+      let crit = d.weapon.crit;
 
       for (const [dx, dy] of DIRS) {
         const n = this.at(c.x + dx, c.y + dy);
         if (!n || !powered.has(`${n.x},${n.y}`)) continue;
-        const nd = this.def(n);
-        const s = nd?.support;
+        const s = this.def(n)?.support;
         if (!s) continue;
-        if (s.damageMult) damageMult *= s.damageMult;
-        if (s.fireRateMult) fireRateMult *= s.fireRateMult;
+        const p = pot.get(`${n.x},${n.y}`) ?? 1;
+        if (s.damageMult) damageMult *= 1 + (s.damageMult - 1) * p;
+        if (s.fireRateMult) fireRateMult *= 1 + (s.fireRateMult - 1) * p;
         if (s.injectElement) element = s.injectElement;
-        if (s.burn) burn += s.burn;
-        if (s.slow) slow = Math.max(slow, s.slow);
-        if (s.rangeAdd) rangeAdd += s.rangeAdd;
+        if (s.burn) burn += s.burn * p;
+        if (s.slow) slow = Math.min(0.9, Math.max(slow, s.slow * p));
+        if (s.critAdd) crit += s.critAdd * p;
+        if (s.rangeAdd) rangeAdd += s.rangeAdd * p;
       }
 
       const w = d.weapon;
+      const m = this.mods;
       out.push({
         x: c.x,
         y: c.y,
         defId: d.id,
         element,
-        damage: w.damage * damageMult,
-        fireRate: w.fireRate * fireRateMult,
-        range: w.range + rangeAdd,
+        damage: w.damage * damageMult * (m.damageMult ?? 1),
+        fireRate: w.fireRate * fireRateMult * (m.fireRateMult ?? 1),
+        range: w.range + rangeAdd + (m.rangeAdd ?? 0),
         projectileSpeed: w.projectileSpeed,
         projectiles: w.projectiles,
+        spread: w.spread,
         chain: w.chain,
         aoe: w.aoe,
         pierce: w.pierce,
+        crit: Math.min(0.9, crit),
         burn,
         slow,
       });
     }
+
+    this.applyLineSets(out);
     return out;
+  }
+
+  /** Line sets: 3+ weapons in a powered row/column gain an Array bonus. */
+  private applyLineSets(weapons: ResolvedWeapon[]): void {
+    const byRow = new Map<number, ResolvedWeapon[]>();
+    const byCol = new Map<number, ResolvedWeapon[]>();
+    for (const w of weapons) {
+      (byRow.get(w.y) ?? byRow.set(w.y, []).get(w.y)!).push(w);
+      (byCol.get(w.x) ?? byCol.set(w.x, []).get(w.x)!).push(w);
+    }
+    const boost = (line: ResolvedWeapon[]) => {
+      if (line.length < 3) return;
+      for (const w of line) {
+        w.damage *= 1.1;
+        w.crit = Math.min(0.9, w.crit + 0.2);
+      }
+    };
+    byRow.forEach(boost);
+    byCol.forEach(boost);
   }
 
   /** Rough total DPS for build-phase feedback. */
   estimateDps(): number {
     let dps = 0;
     for (const w of this.resolveWeapons()) {
-      const perShot = w.damage * Math.max(1, w.projectiles) * (1 + w.chain * 0.6);
+      const critFactor = 1 + w.crit;
+      const perShot = w.damage * critFactor * Math.max(1, w.projectiles) * (1 + w.chain * 0.6);
       dps += perShot * w.fireRate + w.burn * 0.5;
     }
     return Math.round(dps);
   }
 
-  /** Serialisable snapshot (for future save system). */
   snapshot(): Array<{ x: number; y: number; comp: string }> {
     return this.cells
       .filter((c) => c.comp)

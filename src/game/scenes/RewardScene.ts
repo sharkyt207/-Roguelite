@@ -6,7 +6,7 @@
 
 import type { Game, Scene } from "../Game";
 import { COLOR, ELEMENT, RARITY } from "../../core/theme";
-import { DRAFT_POOL, type ComponentDef } from "../components";
+import { draftPool, type ComponentDef } from "../components";
 import { button, pointInRect, roundRect, text, type Rect } from "../../ui/draw";
 import { drawComponentIcon } from "../../ui/icons";
 import { BuildScene } from "./BuildScene";
@@ -23,7 +23,7 @@ export class RewardScene implements Scene {
   }
 
   private roll(): ComponentDef[] {
-    const pool = [...DRAFT_POOL];
+    const pool = draftPool(this.game.meta.unlockedBlueprints);
     const out: ComponentDef[] = [];
     const rng = this.game.rng;
     while (out.length < 3 && pool.length > 0) {
@@ -48,12 +48,14 @@ export class RewardScene implements Scene {
       if (!p.justPressed) continue;
       for (let i = 0; i < this.cards.length; i++) {
         if (pointInRect(p.x, p.y, this.cards[i])) {
+          this.game.audio.play("place");
           this.game.run.inventory.push(this.offer[i].id);
           this.game.setScene(new BuildScene(this.game));
           return;
         }
       }
       if (pointInRect(p.x, p.y, this.rerollBtn) && this.game.run.salvage >= REROLL_COST) {
+        this.game.audio.play("ui");
         this.game.run.salvage -= REROLL_COST;
         this.offer = this.roll();
       }
