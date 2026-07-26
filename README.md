@@ -15,11 +15,40 @@ project. See [`docs/`](docs/) for the full design process:
 - [`docs/02-dna-extraktion.md`](docs/02-dna-extraktion.md) — roguelite DNA (Phase 2)
 - [`docs/03-gdd.md`](docs/03-gdd.md) — the living Game Design Document
 
+## Install as a phone app (PWA)
+
+Grid-Forge is a **Progressive Web App**: it installs to your phone's home screen
+with its own icon, runs fullscreen (no browser bars) and works **offline** — on
+both iOS and Android, no app store needed.
+
+1. **Enable GitHub Pages once:** repo → **Settings → Pages → Build and deployment
+   → Source: “GitHub Actions”.** The workflow in `.github/workflows/pages.yml`
+   then builds and publishes on every push.
+2. On your phone, open the published URL:
+   **`https://sharkyt207.github.io/-roguelite/`**
+3. Install it:
+   - **iPhone (Safari):** Share → **Add to Home Screen**.
+   - **Android (Chrome):** ⋮ menu → **Install app** / **Add to Home Screen**.
+4. Launch it from the new icon — fullscreen, offline-ready.
+
+## Native app (Android APK / app stores) — optional
+
+The same build can be wrapped into a real native app with
+[Capacitor](https://capacitorjs.com) (see `capacitor.config.ts`):
+
+```bash
+npm i -D @capacitor/cli && npm i @capacitor/core @capacitor/android
+npm run build
+npx cap add android
+npx cap sync
+npx cap open android      # build/sign the APK in Android Studio
+```
+
+(iOS additionally needs macOS + Xcode + an Apple Developer account.)
+
 ## Play the prototype
 
-**Online:** enable GitHub Pages once (Settings → Pages → Source: *GitHub Actions*).
-Every push then publishes a phone-playable link via the workflow in
-`.github/workflows/pages.yml`.
+**Online:** the GitHub Pages URL above is playable in any phone browser too.
 
 **Local:**
 

@@ -15,3 +15,13 @@ game.start(new TitleScene(game));
 // Prevent iOS bounce / double-tap zoom.
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("dblclick", (e) => e.preventDefault());
+
+// Register the service worker so the installed PWA works offline.
+// Guarded to https so it never errors on file:// or embedded previews.
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      /* offline support unavailable — game still runs online */
+    });
+  });
+}
