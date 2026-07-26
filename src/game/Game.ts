@@ -36,7 +36,7 @@ export class Game {
     this.vp = createViewport(canvas);
     this.input = new Input(canvas);
     this.meta = loadMeta();
-    this.audio = new Audio(this.meta.muted);
+    this.audio = new Audio(this.meta.muted, this.meta.musicOn);
     this.rng = new RNG();
     this.run = new RunState(this.meta);
   }

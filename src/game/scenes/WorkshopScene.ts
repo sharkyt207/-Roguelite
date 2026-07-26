@@ -13,6 +13,7 @@ import { COLOR, RARITY } from "../../core/theme";
 import { CHASSIS_LIST } from "../chassis";
 import { UPGRADES, BLUEPRINTS } from "../meta";
 import { COMPONENTS } from "../components";
+import { ACHIEVEMENTS } from "../achievements";
 import { button, pointInRect, roundRect, text, type Rect } from "../../ui/draw";
 import { TitleScene } from "./TitleScene";
 
@@ -23,7 +24,9 @@ type Item =
   | { kind: "chassis"; y: number; h: number; rect: Rect; index: number }
   | { kind: "upgrade"; y: number; h: number; rect: Rect; index: number }
   | { kind: "blueprint"; y: number; h: number; rect: Rect; index: number }
-  | { kind: "mute"; y: number; h: number; rect: Rect };
+  | { kind: "achievement"; y: number; h: number; rect: Rect; index: number }
+  | { kind: "mute"; y: number; h: number; rect: Rect }
+  | { kind: "music"; y: number; h: number; rect: Rect };
 
 export class WorkshopScene implements Scene {
   private items: Item[] = [];
@@ -37,7 +40,9 @@ export class WorkshopScene implements Scene {
   private startScroll = 0;
   private moved = false;
 
-  constructor(private game: Game) {}
+  constructor(private game: Game) {
+    game.audio.setMusic("menu");
+  }
 
   update(_dt: number): void {
     this.layout();
@@ -106,6 +111,10 @@ export class WorkshopScene implements Scene {
         meta.unlockedBlueprints.push(bp.id);
       } else if (it.kind === "mute") {
         meta.muted = this.game.audio.toggleMute();
+      } else if (it.kind === "music") {
+        meta.musicOn = this.game.audio.toggleMusic();
+      } else if (it.kind === "achievement") {
+        return; // read-only
       }
       this.game.saveMeta();
       this.game.audio.play("ui");
@@ -170,7 +179,19 @@ export class WorkshopScene implements Scene {
     });
     y += Math.ceil(BLUEPRINTS.length / 2) * 50 + 14;
 
-    this.items.push({ kind: "mute", y, h: 40, rect: { x: width / 2 - 90, y, w: 180, h: 38 } });
+    // Achievements (read-only rows).
+    this.items.push({ kind: "label", y, h: 18, text: "ACHIEVEMENTS" });
+    y += 22;
+    ACHIEVEMENTS.forEach((_, i) => {
+      this.items.push({ kind: "achievement", y, h: 44, rect: { x: pad, y, w: width - pad * 2, h: 40 }, index: i });
+      y += 46;
+    });
+    y += 12;
+
+    // Sound + Music toggles side by side.
+    const half = (width - pad * 2 - 10) / 2;
+    this.items.push({ kind: "mute", y, h: 40, rect: { x: pad, y, w: half, h: 38 } });
+    this.items.push({ kind: "music", y, h: 40, rect: { x: pad + half + 10, y, w: half, h: 38 } });
     y += 48;
 
     this.contentH = y;
@@ -201,9 +222,14 @@ export class WorkshopScene implements Scene {
         this.drawUpgrade(it.rect, it.index);
       } else if (it.kind === "blueprint") {
         this.drawBlueprint(it.rect, it.index);
+      } else if (it.kind === "achievement") {
+        this.drawAchievement(it.rect, it.index);
       } else if (it.kind === "mute") {
         const r = this.screenRect(it.rect);
-        button(ctx, r, meta.muted ? "🔇 Sound: OFF" : "🔊 Sound: ON", { color: COLOR.metal, textColor: COLOR.text });
+        button(ctx, r, meta.muted ? "🔇 SFX off" : "🔊 SFX on", { color: COLOR.metal, textColor: COLOR.text });
+      } else if (it.kind === "music") {
+        const r = this.screenRect(it.rect);
+        button(ctx, r, meta.musicOn ? "♪ Music on" : "♪ Music off", { color: COLOR.metal, textColor: COLOR.text });
       }
     }
     ctx.restore();
@@ -229,6 +255,34 @@ export class WorkshopScene implements Scene {
     ctx.moveTo(0, HEADER_H);
     ctx.lineTo(width, HEADER_H);
     ctx.stroke();
+  }
+
+  private drawAchievement(rect: Rect, i: number): void {
+    const { ctx } = this.game.vp;
+    const meta = this.game.meta;
+    const a = ACHIEVEMENTS[i];
+    const r = this.screenRect(rect);
+    const owned = meta.achievements.includes(a.id);
+    roundRect(ctx, r.x, r.y, r.w, r.h, 8);
+    ctx.fillStyle = owned ? "rgba(90,209,122,0.10)" : COLOR.bgPanel;
+    ctx.fill();
+    ctx.strokeStyle = owned ? COLOR.ok : COLOR.gridLine;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    text(ctx, `${owned ? "🏆" : "🔒"} ${a.name}`, r.x + 10, r.y + 16, {
+      size: 12.5,
+      color: owned ? COLOR.ok : COLOR.textDim,
+      weight: "700",
+    });
+    if (a.cores > 0) {
+      text(ctx, `◆ ${a.cores}`, r.x + r.w - 10, r.y + 16, {
+        size: 11,
+        color: owned ? COLOR.ok : COLOR.textDim,
+        align: "right",
+        weight: "700",
+      });
+    }
+    this.wrap(a.desc, r.x + 10, r.y + 31, r.w - 20, 11, 9.5, COLOR.textDim);
   }
 
   private drawChassis(rect: Rect, i: number): void {

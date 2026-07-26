@@ -20,6 +20,7 @@ export class RewardScene implements Scene {
 
   constructor(private game: Game) {
     this.offer = this.roll();
+    game.audio.setMusic("menu");
   }
 
   private roll(): ComponentDef[] {

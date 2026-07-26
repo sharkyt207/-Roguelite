@@ -27,8 +27,10 @@ export interface MetaSave {
   selectedChassis: string;
   unlockedBlueprints: string[];
   muted: boolean;
+  musicOn: boolean;
   seenTutorial: boolean;
   daily: { date: string; bestWave: number; won: boolean } | null;
+  achievements: string[];
   stats: { runs: number; wins: number; bestWave: number; bestDepth: number };
 }
 
@@ -78,8 +80,10 @@ export function defaultSave(): MetaSave {
     selectedChassis: "scrapheap",
     unlockedBlueprints: [],
     muted: false,
+    musicOn: true,
     seenTutorial: false,
     daily: null,
+    achievements: [],
     stats: { runs: 0, wins: 0, bestWave: 0, bestDepth: 0 },
   };
 }

@@ -20,7 +20,9 @@ export class TitleScene implements Scene {
   private btns: Btn[] = [];
   private t = 0;
 
-  constructor(private game: Game) {}
+  constructor(private game: Game) {
+    game.audio.setMusic("menu");
+  }
 
   update(dt: number): void {
     this.t += dt;
@@ -148,6 +150,6 @@ export class TitleScene implements Scene {
         align: "center",
       });
     }
-    text(ctx, "Prototype v0.4.1", cx, height - 20, { size: 11, color: COLOR.textDim, align: "center" });
+    text(ctx, "Prototype v0.5", cx, height - 20, { size: 11, color: COLOR.textDim, align: "center" });
   }
 }

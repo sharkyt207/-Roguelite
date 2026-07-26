@@ -35,6 +35,7 @@ export class BuildScene implements Scene {
   constructor(private game: Game) {
     // Checkpoint: persist the run so it can be resumed after closing the tab.
     saveRun(game.run);
+    game.audio.setMusic("menu");
   }
 
   private layout(): void {

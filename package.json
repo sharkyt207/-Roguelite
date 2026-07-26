@@ -1,6 +1,6 @@
 {
   "name": "grid-forge",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Grid-Forge — a mobile-first roguelite where your build is a spatial puzzle.",
   "type": "module",
   "scripts": {

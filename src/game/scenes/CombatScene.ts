@@ -152,6 +152,7 @@ export class CombatScene implements Scene {
     this.timeLeft = wave.duration;
     this.spawnAcc = wave.spawns.map(() => 0);
     this.weapons = game.run.grid.resolveWeapons().map((w) => ({ w, cd: game.rng.range(0, 0.3) }));
+    game.audio.setMusic(wave.boss ? "boss" : "combat");
     game.audio.resume();
     game.audio.play("deploy");
     // The player has now deployed at least once — never show the build tutorial again.
@@ -460,6 +461,7 @@ export class CombatScene implements Scene {
       e.slowT = 1.2;
     }
 
+    if (dmg > this.game.run.maxHit) this.game.run.maxHit = dmg;
     this.spawnDamage(e.x, e.y, dmg, crit || detonated, detonated ? ELEMENT.volt.color : crit ? "#ffffff" : color);
     this.spawnParticles(e.x, e.y, color, 3);
     this.game.audio.play("hit");

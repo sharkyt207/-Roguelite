@@ -21,7 +21,9 @@ export class EncyclopediaScene implements Scene {
   private dragStartY = 0;
   private startScroll = 0;
 
-  constructor(private game: Game) {}
+  constructor(private game: Game) {
+    game.audio.setMusic("menu");
+  }
 
   update(_dt: number): void {
     const pad = 14;

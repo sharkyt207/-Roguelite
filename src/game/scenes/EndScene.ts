@@ -11,6 +11,7 @@ import { TitleScene } from "./TitleScene";
 import { WorkshopScene } from "./WorkshopScene";
 import { RewardScene } from "./RewardScene";
 import { todayKey } from "../daily";
+import { checkAchievements, type Achievement } from "../achievements";
 
 interface Btn {
   rect: Rect;
@@ -23,6 +24,7 @@ export class EndScene implements Scene {
   private btns: Btn[] = [];
   private coresEarned: number;
   private wasEndless: boolean;
+  private unlocked: Achievement[] = [];
 
   constructor(
     private game: Game,
@@ -35,6 +37,11 @@ export class EndScene implements Scene {
     game.meta.cores += this.coresEarned;
     game.meta.stats.runs += 1;
     if (won) game.meta.stats.wins += 1;
+    if (run.endless) game.meta.stats.bestDepth = Math.max(game.meta.stats.bestDepth, run.depth);
+    game.audio.setMusic("menu");
+
+    // Newly earned achievements (grants their Cores too).
+    this.unlocked = checkAchievements({ meta: game.meta, run, won });
 
     if (run.daily) {
       const key = todayKey();
@@ -124,6 +131,15 @@ export class EndScene implements Scene {
 
     for (const b of this.btns) {
       button(ctx, b.rect, b.label, b.primary ? {} : { color: COLOR.bgPanel2, textColor: COLOR.text });
+    }
+
+    // Achievement summary (compact, never overlaps the buttons).
+    if (this.unlocked.length) {
+      const bonus = this.unlocked.reduce((s, a) => s + a.cores, 0);
+      const names = this.unlocked.map((a) => a.name).join(", ");
+      const label = `🏆 ${this.unlocked.length} unlocked${bonus > 0 ? `  (+${bonus} Cores)` : ""}`;
+      text(ctx, label, width / 2, height * 0.44 + 76, { size: 13, color: COLOR.amber, align: "center", weight: "800" });
+      text(ctx, names, width / 2, height * 0.44 + 94, { size: 11, color: COLOR.textDim, align: "center" });
     }
   }
 }

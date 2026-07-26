@@ -179,7 +179,19 @@ Landschaft werden zu wanderndem Schrott. Du überlebst, indem du aus Salvage ein
 - **Portierung:** bei Bedarf später Godot/Unity; Datenmodell (Komponenten/Adjazenz) ist
   engine-unabhängig gehalten.
 
-## Prototyp-Status (v0.4.1 — lauffähig)
+## Prototyp-Status (v0.5 — lauffähig)
+
+**Achievements:** 10 persistente Langzeitziele (Siege, Tiefe, Blueprints, Overkill,
+Salvage, Daily, Chassis-Sammlung …), die einmalig Cores vergeben. Prüfung am Run-Ende,
+Zusammenfassungs-Toast im End-Screen, vollständige Liste (locked/unlocked) im Workshop.
+
+**Musik-Layer:** assetfreier generativer Web-Audio-Soundtrack mit drei Stimmungen
+(Menü / Kampf / Boss) via Lookahead-Scheduler; eigener Music-Toggle neben dem SFX-Toggle,
+in den Speicher integriert.
+
+**PWA-Update:** Service-Worker-Cache auf v2 gehoben, damit installierte Apps das Update ziehen.
+
+### Frühere Meilensteine (v0.4.1)
 
 **Bugfix (kritisch):** Build-Phase-Drag & Drop war blockiert. Ursache: beim Aufheben
 eines Teils wurde `inventory` gekürzt, aber `trayRects` behielt die alte Länge → im

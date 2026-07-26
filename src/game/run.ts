@@ -59,6 +59,8 @@ export class RunState {
   modifier?: DailyModifier;
   /** Endless "The Deep" mode, entered after beating the final boss. */
   endless = false;
+  /** Largest single-hit damage this run (for achievements). */
+  maxHit = 0;
 
   constructor(meta: MetaSave, modifier?: DailyModifier, chassisId?: string) {
     const chassis = CHASSIS[chassisId ?? meta.selectedChassis] ?? CHASSIS.scrapheap;
