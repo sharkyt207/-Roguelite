@@ -179,7 +179,18 @@ Landschaft werden zu wanderndem Schrott. Du überlebst, indem du aus Salvage ein
 - **Portierung:** bei Bedarf später Godot/Unity; Datenmodell (Komponenten/Adjazenz) ist
   engine-unabhängig gehalten.
 
-## Prototyp-Status (v0.5 — lauffähig)
+## Prototyp-Status (v0.5.1 — lauffähig)
+
+**iPhone Safe-Area-Fix:** Canvas wird per `env(safe-area-inset-*)` + `100dvh` auf den
+sicheren Bereich beschränkt (Rendering misst die tatsächliche Canvas-Größe). HUD sitzt
+nicht mehr unter Statusleiste/Notch, Steuerung nicht unter dem Home-Indikator.
+
+**Grafik-Politur:** Verlaufs-Hintergrund + driftender Parallax-Staub im Kampf,
+schattierte Gegner-Silhouetten je Archetyp (Rusher=Dreieck, Spitter=Raute, Tank=Hexagon,
+Brood=Kreis+Ring, Boss=Aura-Ring) mit Highlight & Rim, Projektil-Trails, Vignette in
+Kampf & Menü, Amber-Glow hinter dem Logo. SW-Cache v3.
+
+### Frühere Meilensteine (v0.5)
 
 **Achievements:** 10 persistente Langzeitziele (Siege, Tiefe, Blueprints, Overkill,
 Salvage, Daily, Chassis-Sammlung …), die einmalig Cores vergeben. Prüfung am Run-Ende,

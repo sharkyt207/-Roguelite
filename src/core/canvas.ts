@@ -25,12 +25,13 @@ export function createViewport(canvas: HTMLCanvasElement): Viewport {
 
   const resize = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    // Use the canvas's rendered size (CSS controls it via safe-area insets),
+    // so all game coordinates live inside the safe area — never under the notch.
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
     canvas.width = Math.floor(w * dpr);
     canvas.height = Math.floor(h * dpr);
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     vp.width = w;
@@ -41,6 +42,8 @@ export function createViewport(canvas: HTMLCanvasElement): Viewport {
   resize();
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", resize);
+  // Mobile browser chrome show/hide changes the visual viewport height.
+  window.visualViewport?.addEventListener("resize", resize);
 
   return vp;
 }

@@ -15,7 +15,7 @@ import type { Game, Scene } from "../Game";
 import { COLOR, ELEMENT, type ElementId } from "../../core/theme";
 import { ENEMIES, type EnemyAI, type EnemyDef } from "../enemies";
 import type { ResolvedWeapon } from "../grid";
-import { roundRect, text, button, pointInRect, type Rect } from "../../ui/draw";
+import { roundRect, text, button, pointInRect, vignette, type Rect } from "../../ui/draw";
 import { RewardScene } from "./RewardScene";
 import { EndScene } from "./EndScene";
 import { TitleScene } from "./TitleScene";
@@ -24,6 +24,7 @@ const CHILL_AMP = 1.35;
 const CRIT_MULT = 2;
 
 interface Enemy {
+  id: string;
   x: number;
   y: number;
   hp: number;
@@ -137,6 +138,9 @@ export class CombatScene implements Scene {
   private joyX = 0;
   private joyY = 0;
 
+  /** Parallax dust motes for background depth. */
+  private dust: Array<{ x: number; y: number; z: number; r: number }> = [];
+
   private overBtn = { x: 0, y: 0, r: 44 };
   private pauseBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
   private resumeBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
@@ -152,6 +156,10 @@ export class CombatScene implements Scene {
     this.timeLeft = wave.duration;
     this.spawnAcc = wave.spawns.map(() => 0);
     this.weapons = game.run.grid.resolveWeapons().map((w) => ({ w, cd: game.rng.range(0, 0.3) }));
+    for (let i = 0; i < 46; i++) {
+      const z = game.rng.range(0.3, 1);
+      this.dust.push({ x: game.rng.range(0, width), y: game.rng.range(0, height), z, r: 0.6 + z * 1.6 });
+    }
     game.audio.setMusic(wave.boss ? "boss" : "combat");
     game.audio.resume();
     game.audio.play("deploy");
@@ -297,6 +305,7 @@ export class CombatScene implements Scene {
   private makeEnemy(def: EnemyDef, x: number, y: number): Enemy {
     const scale = (1 + this.game.run.waveIndex * 0.1) * (this.game.run.modifier?.enemyHpMult ?? 1);
     return {
+      id: def.id,
       x,
       y,
       hp: def.hp * scale,
@@ -749,22 +758,41 @@ export class CombatScene implements Scene {
   render(): void {
     const { ctx, width, height } = this.game.vp;
 
-    ctx.fillStyle = "#070b10";
+    // Depth background: radial gradient + faint grid + drifting parallax dust.
+    const bg = ctx.createRadialGradient(width / 2, height * 0.42, 40, width / 2, height * 0.5, Math.max(width, height) * 0.85);
+    bg.addColorStop(0, "#0a121a");
+    bg.addColorStop(1, "#05080c");
+    ctx.fillStyle = bg;
     ctx.fillRect(-20, -20, width + 40, height + 40);
-    ctx.strokeStyle = "#0f1620";
+
+    ctx.strokeStyle = "#0d141d";
     ctx.lineWidth = 1;
-    for (let x = 0; x < width; x += 40) {
+    for (let x = 0; x < width; x += 44) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
       ctx.stroke();
     }
-    for (let y = 0; y < height; y += 40) {
+    for (let y = 0; y < height; y += 44) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
       ctx.stroke();
     }
+
+    for (const d of this.dust) {
+      d.y += (8 + d.z * 22) * (1 / 60);
+      if (d.y > height + 4) {
+        d.y = -4;
+        d.x = Math.random() * width;
+      }
+      ctx.globalAlpha = 0.05 + d.z * 0.12;
+      ctx.fillStyle = d.z > 0.7 ? COLOR.energy : COLOR.metalLight;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
 
     for (const c of this.chains) {
       ctx.strokeStyle = c.color;
@@ -788,14 +816,16 @@ export class CombatScene implements Scene {
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      ctx.fillStyle = e.flash > 0 ? "#ffffff" : e.burnT > 0 ? "#ff8a3d" : e.color;
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
-      ctx.fill();
+      const col = e.flash > 0 ? "#ffffff" : e.burnT > 0 ? "#ff8a3d" : e.color;
+      this.drawEnemyShape(e, col);
       if (e.slowT > 0) {
         ctx.strokeStyle = ELEMENT.frost.color;
         ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r + 2, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.globalAlpha = 1;
       }
       if (e.boss) {
         const bw = e.r * 2;
@@ -820,6 +850,17 @@ export class CombatScene implements Scene {
     ctx.shadowBlur = 0;
 
     for (const p of this.projectiles) {
+      // Motion trail streak behind the projectile.
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = p.r * 1.4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.vx * 0.025, p.y - p.vy * 0.025);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Glowing head.
       ctx.fillStyle = p.color;
       ctx.shadowColor = p.color;
       ctx.shadowBlur = 8;
@@ -862,6 +903,8 @@ export class CombatScene implements Scene {
       ctx.globalAlpha = 1;
     }
 
+    vignette(ctx, width, height, 0.5);
+
     this.renderHud();
     if (this.game.tutorialActive) this.renderTutorial();
     if (this.paused) this.renderPause();
@@ -898,6 +941,79 @@ export class CombatScene implements Scene {
     ctx.lineWidth = 1.5;
     ctx.stroke();
     text(ctx, msg, width / 2, y + 20, { size: 13, color: COLOR.text, align: "center", baseline: "middle" });
+  }
+
+  /** Draw an enemy as a shaded archetype silhouette. */
+  private drawEnemyShape(e: Enemy, col: string): void {
+    const { ctx } = this.game.vp;
+    const r = e.r;
+    const path = () => {
+      ctx.beginPath();
+      switch (e.id) {
+        case "rusher":
+          ctx.moveTo(e.x, e.y - r);
+          ctx.lineTo(e.x + r * 0.92, e.y + r * 0.72);
+          ctx.lineTo(e.x - r * 0.92, e.y + r * 0.72);
+          ctx.closePath();
+          break;
+        case "spitter":
+          ctx.moveTo(e.x, e.y - r);
+          ctx.lineTo(e.x + r, e.y);
+          ctx.lineTo(e.x, e.y + r);
+          ctx.lineTo(e.x - r, e.y);
+          ctx.closePath();
+          break;
+        case "tank":
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+            const px = e.x + Math.cos(a) * r;
+            const py = e.y + Math.sin(a) * r;
+            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          break;
+        default:
+          ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+      }
+    };
+
+    // Boss aura.
+    if (e.boss) {
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = 0.25 + 0.2 * Math.sin(this.elapsed * 4);
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, r + 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.fillStyle = col;
+    path();
+    ctx.fill();
+
+    // Top-left highlight for a rounded, lit look.
+    const hg = ctx.createRadialGradient(e.x - r * 0.35, e.y - r * 0.4, 1, e.x, e.y, r * 1.15);
+    hg.addColorStop(0, "rgba(255,255,255,0.38)");
+    hg.addColorStop(0.55, "rgba(255,255,255,0)");
+    ctx.fillStyle = hg;
+    path();
+    ctx.fill();
+
+    // Dark rim.
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 2;
+    path();
+    ctx.stroke();
+
+    // Brood inner ring.
+    if (e.id === "brood") {
+      ctx.strokeStyle = "rgba(5,7,10,0.6)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, r * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   private renderChassis(): void {

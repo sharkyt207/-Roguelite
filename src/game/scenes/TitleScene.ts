@@ -4,7 +4,7 @@ import { CHASSIS } from "../chassis";
 import { dailyFor } from "../daily";
 import { loadRun } from "../persistence";
 import { todayKey } from "../daily";
-import { button, pointInRect, text, type Rect } from "../../ui/draw";
+import { button, pointInRect, text, vignette, type Rect } from "../../ui/draw";
 import { BuildScene } from "./BuildScene";
 import { WorkshopScene } from "./WorkshopScene";
 import { EncyclopediaScene } from "./EncyclopediaScene";
@@ -111,7 +111,17 @@ export class TitleScene implements Scene {
     }
     ctx.globalAlpha = 1;
 
+    vignette(ctx, width, height, 0.45);
+
     const top = height * 0.15;
+
+    // Soft amber glow behind the logo.
+    const glow = ctx.createRadialGradient(cx, top + 30, 10, cx, top + 30, Math.min(width, height) * 0.5);
+    glow.addColorStop(0, "rgba(255,158,61,0.16)");
+    glow.addColorStop(1, "rgba(255,158,61,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+
     text(ctx, "GRID", cx, top, { size: 64, color: COLOR.text, align: "center", baseline: "middle", weight: "900" });
     text(ctx, "FORGE", cx, top + 58, { size: 64, color: COLOR.amber, align: "center", baseline: "middle", weight: "900" });
     text(ctx, "Build the machine. Survive the salvage.", cx, top + 108, {
@@ -150,6 +160,6 @@ export class TitleScene implements Scene {
         align: "center",
       });
     }
-    text(ctx, "Prototype v0.5", cx, height - 20, { size: 11, color: COLOR.textDim, align: "center" });
+    text(ctx, "Prototype v0.5.1", cx, height - 20, { size: 11, color: COLOR.textDim, align: "center" });
   }
 }

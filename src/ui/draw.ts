@@ -57,6 +57,15 @@ export function pointInRect(px: number, py: number, r: Rect): boolean {
   return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
 }
 
+/** Soft radial vignette over the whole viewport for depth/focus. */
+export function vignette(ctx: CanvasRenderingContext2D, w: number, h: number, strength = 0.55): void {
+  const g = ctx.createRadialGradient(w / 2, h * 0.46, Math.min(w, h) * 0.28, w / 2, h * 0.5, Math.max(w, h) * 0.75);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, `rgba(0,0,0,${strength})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+}
+
 export function button(
   ctx: CanvasRenderingContext2D,
   r: Rect,

@@ -8,7 +8,7 @@
  * Bump CACHE on each release so clients pick up the new build.
  */
 
-const CACHE = "grid-forge-v2";
+const CACHE = "grid-forge-v3";
 const ASSETS = [
   "./",
   "./index.html",
