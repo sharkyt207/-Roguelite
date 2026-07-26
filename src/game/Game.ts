@@ -25,6 +25,8 @@ export class Game {
   run: RunState;
   /** Screen-shake magnitude in px, decays over time (Block C). */
   shake = 0;
+  /** True during a run while first-time coach marks should be shown. */
+  tutorialActive = false;
   private scene!: Scene;
   private lastTime = 0;
 
@@ -44,6 +46,7 @@ export class Game {
   newRun(): void {
     this.rng = new RNG();
     this.run = new RunState(this.meta);
+    this.tutorialActive = !this.meta.seenTutorial;
   }
 
   saveMeta(): void {

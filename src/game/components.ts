@@ -37,6 +37,8 @@ export interface WeaponStats {
   pierce: number;
   /** Crit chance (0..1); crits deal 2x. */
   crit: number;
+  /** Projectiles steer toward the nearest enemy. */
+  homing: boolean;
 }
 
 export interface SupportMods {
@@ -52,6 +54,12 @@ export interface SupportMods {
   rangeAdd?: number;
   /** Crit chance added to adjacent weapons. */
   critAdd?: number;
+  /** Pierce added to adjacent weapons. */
+  pierceAdd?: number;
+  /** Extra projectiles added to adjacent weapons. */
+  projectilesAdd?: number;
+  /** Integrity healed whenever an adjacent weapon gets a kill. */
+  lifesteal?: number;
   /** Multiplies the numeric effects of ADJACENT supports (support-of-support). */
   supportBoost?: number;
 }
@@ -82,6 +90,7 @@ const W = (s: Partial<WeaponStats>): WeaponStats => ({
   aoe: 0,
   pierce: 0,
   crit: 0.05,
+  homing: false,
   ...s,
 });
 
@@ -169,6 +178,37 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     weight: 2,
     blueprint: true,
   },
+  frost_lance: {
+    id: "frost_lance",
+    name: "Frost Lance",
+    category: "weapon",
+    rarity: "uncommon",
+    element: "frost",
+    desc: "Piercing icicle that chills and slows the line it hits.",
+    weapon: W({ damage: 11, fireRate: 1.4, range: 340, pierce: 2, projectileSpeed: 720 }),
+    weight: 3,
+  },
+  pulse_drone: {
+    id: "pulse_drone",
+    name: "Pulse Drone",
+    category: "weapon",
+    rarity: "uncommon",
+    element: "volt",
+    desc: "Fires homing pulses that steer into enemies.",
+    weapon: W({ damage: 7, fireRate: 1.8, range: 320, homing: true, projectileSpeed: 340 }),
+    weight: 3,
+  },
+  flamethrower: {
+    id: "flamethrower",
+    name: "Flamethrower",
+    category: "weapon",
+    rarity: "rare",
+    element: "ember",
+    desc: "Short-range cone of flames that ignites everything it touches.",
+    weapon: W({ damage: 3, fireRate: 6, range: 150, projectiles: 3, spread: 0.5, projectileSpeed: 380 }),
+    weight: 2,
+    blueprint: true,
+  },
 
   // ---- Support ---------------------------------------------------------
   ember_cell: {
@@ -242,6 +282,46 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     support: { critAdd: 0.2 },
     weight: 2,
     blueprint: true,
+  },
+  piercing_lens: {
+    id: "piercing_lens",
+    name: "Piercing Lens",
+    category: "support",
+    rarity: "uncommon",
+    element: "kinetic",
+    desc: "Adjacent weapons' shots pierce +2 enemies.",
+    support: { pierceAdd: 2 },
+    weight: 3,
+  },
+  multiloader: {
+    id: "multiloader",
+    name: "Multiloader",
+    category: "support",
+    rarity: "rare",
+    element: "kinetic",
+    desc: "Adjacent weapons fire +1 projectile (in a small spread).",
+    support: { projectilesAdd: 1 },
+    weight: 2,
+  },
+  siphon: {
+    id: "siphon",
+    name: "Siphon",
+    category: "support",
+    rarity: "uncommon",
+    element: "frost",
+    desc: "Restore 3 Integrity whenever an adjacent weapon scores a kill.",
+    support: { lifesteal: 3 },
+    weight: 3,
+  },
+  focus_array: {
+    id: "focus_array",
+    name: "Focus Array",
+    category: "support",
+    rarity: "uncommon",
+    element: "volt",
+    desc: "Adjacent weapons: +90 range and +15% damage.",
+    support: { rangeAdd: 90, damageMult: 1.15 },
+    weight: 3,
   },
 };
 

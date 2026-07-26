@@ -82,6 +82,6 @@ export class TitleScene implements Scene {
 
     button(ctx, this.playBtn, "▶  NEW RUN");
     button(ctx, this.shopBtn, "◆  WORKSHOP", { color: COLOR.energy, textColor: "#05070a" });
-    text(ctx, "Prototype v0.2", cx, height - 24, { size: 12, color: COLOR.textDim, align: "center" });
+    text(ctx, "Prototype v0.3", cx, height - 24, { size: 12, color: COLOR.textDim, align: "center" });
   }
 }

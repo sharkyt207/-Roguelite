@@ -179,7 +179,21 @@ Landschaft werden zu wanderndem Schrott. Du überlebst, indem du aus Salvage ein
 - **Portierung:** bei Bedarf später Godot/Unity; Datenmodell (Komponenten/Adjazenz) ist
   engine-unabhängig gehalten.
 
-## Prototyp-Status (v0.2 — lauffähig)
+## Prototyp-Status (v0.3 — lauffähig)
+
+**Content & Bosse:** 8 Wellen über 3 Sektoren mit **3 Bossen** und echter KI:
+*Reclaimer* (beschwört Adds), *Harvester* (telegrafierte Radial-Bullet-Bursts),
+*The Overmind* (Beschwörung + Bursts + Enrage < 40 % HP). Neue Gegner: Spitter
+(Fernkampf mit Gegner-Projektilen), Brood (teilt sich beim Tod), Hauler (Tank).
+Neue Waffen (Frost Lance, Pulse Drone/Homing, Flamethrower) & Supports
+(Piercing Lens, Multiloader, Siphon/Lifesteal, Focus Array).
+
+**Onboarding:** kontextuelle First-Run-Coach-Marks in Build- & Kampfphase
+(einmalig, via `seenTutorial`-Flag im Speicher).
+
+**Balancing-Pass:** Wellen-/Boss-HP-Kurven, Skalierung, Cores-Ökonomie justiert.
+
+### Frühere Meilensteine
 
 Spielbarer Loop: Title → Build (tap&drag, Power/Synergie live) → Combat
 (Floating-Joystick, Auto-Feuer, 4 Elemente, Overcharge) → Reward-Draft (3-aus-N + Reroll)

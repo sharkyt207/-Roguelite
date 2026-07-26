@@ -217,6 +217,7 @@ export class BuildScene implements Scene {
 
     // ---- Deploy -----------------------------------------------------
     button(ctx, this.deployBtn, "▶  DEPLOY");
+    if (this.game.tutorialActive && !this.drag) this.renderTutorial();
 
     // ---- Dragged piece ---------------------------------------------
     if (this.drag) {
@@ -245,6 +246,27 @@ export class BuildScene implements Scene {
         baseline: "middle",
       });
     }
+  }
+
+  private renderTutorial(): void {
+    const { ctx, width } = this.game.vp;
+    const run = this.game.run;
+    let msg: string;
+    if (run.grid.estimateDps() === 0)
+      msg = "Drag a weapon next to the Reactor Core (teal) so it's powered.";
+    else if (run.inventory.length > 0) msg = "Place your parts on glowing cells, then DEPLOY.";
+    else msg = "Line up 3 weapons in a row for a bonus. Ready? DEPLOY!";
+
+    const w = Math.min(width - 32, 360);
+    const x = width / 2 - w / 2;
+    const y = this.deployBtn.y - 46;
+    roundRect(ctx, x, y, w, 38, 10);
+    ctx.fillStyle = "rgba(13,17,23,0.92)";
+    ctx.fill();
+    ctx.strokeStyle = COLOR.amber;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    text(ctx, msg, width / 2, y + 19, { size: 12.5, color: COLOR.text, align: "center", baseline: "middle" });
   }
 
   private renderLinks(powered: Set<string>): void {

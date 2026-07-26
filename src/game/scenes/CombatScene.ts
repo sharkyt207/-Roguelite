@@ -5,14 +5,15 @@
  * Weapons resolved from the grid auto-fire at the nearest enemy in range.
  * Overcharge: a tappable button that unleashes an AoE nova + fire-rate surge.
  *
- * Block A reactions: chilled enemies take +35% damage; a Volt hit on a burning
- * enemy detonates it. Block C juice: crits, damage numbers, hit flash, screen
- * shake and synth SFX.
+ * Enemies: chase / ranged spitters / splitters, plus three bosses with real
+ * mechanics (summon adds, telegraphed radial bullet bursts, enrage).
+ * Reactions: chilled enemies take +35% damage; a Volt hit on a burning enemy
+ * detonates it. Juice: crits, damage numbers, hit flash, screen shake, SFX.
  */
 
 import type { Game, Scene } from "../Game";
 import { COLOR, ELEMENT, type ElementId } from "../../core/theme";
-import { ENEMIES } from "../enemies";
+import { ENEMIES, type EnemyAI, type EnemyDef } from "../enemies";
 import type { ResolvedWeapon } from "../grid";
 import { roundRect, text } from "../../ui/draw";
 import { RewardScene } from "./RewardScene";
@@ -32,12 +33,22 @@ interface Enemy {
   contact: number;
   salvage: number;
   boss: boolean;
+  ai: EnemyAI;
+  shootRate: number;
+  shootDmg: number;
+  shootRange: number;
+  splitInto?: string;
+  splitCount: number;
   slowT: number;
   slowF: number;
   burnDps: number;
   burnT: number;
   hitCd: number;
   flash: number;
+  shootCd: number;
+  abilityCd: number;
+  telegraph: number;
+  enraged: boolean;
 }
 
 interface Projectile {
@@ -54,9 +65,20 @@ interface Projectile {
   pierce: number;
   aoe: number;
   chain: number;
+  homing: boolean;
+  lifesteal: number;
   burn: number;
   slow: number;
   hit: Set<Enemy>;
+}
+
+interface EnemyShot {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  dmg: number;
+  life: number;
 }
 
 interface Particle {
@@ -93,6 +115,7 @@ export class CombatScene implements Scene {
   private weapons: WeaponRT[];
   private enemies: Enemy[] = [];
   private projectiles: Projectile[] = [];
+  private enemyShots: EnemyShot[] = [];
   private particles: Particle[] = [];
   private floaters: Floater[] = [];
   private chains: Array<{ x1: number; y1: number; x2: number; y2: number; life: number; color: string }> = [];
@@ -125,6 +148,11 @@ export class CombatScene implements Scene {
     this.weapons = game.run.grid.resolveWeapons().map((w) => ({ w, cd: game.rng.range(0, 0.3) }));
     game.audio.resume();
     game.audio.play("deploy");
+    // The player has now deployed at least once — never show the build tutorial again.
+    if (!game.meta.seenTutorial) {
+      game.meta.seenTutorial = true;
+      game.saveMeta();
+    }
   }
 
   // -------------------------------------------------------------- update
@@ -139,6 +167,7 @@ export class CombatScene implements Scene {
     this.updateWeapons(dt);
     this.updateProjectiles(dt);
     this.updateEnemies(dt);
+    this.updateEnemyShots(dt);
     this.updateParticles(dt);
     this.updateFloaters(dt);
     for (const c of this.chains) c.life -= dt;
@@ -154,10 +183,7 @@ export class CombatScene implements Scene {
       this.completeWave();
     }
 
-    if (this.game.run.hp <= 0) {
-      this.game.setScene(new EndScene(this.game, false));
-    }
-
+    if (this.game.run.hp <= 0) this.game.setScene(new EndScene(this.game, false));
     void height;
   }
 
@@ -182,9 +208,7 @@ export class CombatScene implements Scene {
       this.joyX = joy.x;
       this.joyY = joy.y;
     }
-    if (input.releasedThisFrame.some((r) => r.id === this.joyId)) {
-      this.joyId = null;
-    }
+    if (input.releasedThisFrame.some((r) => r.id === this.joyId)) this.joyId = null;
   }
 
   private moveChassis(dt: number): void {
@@ -194,10 +218,8 @@ export class CombatScene implements Scene {
       const mag = Math.hypot(dx, dy);
       if (mag > 8) {
         const clamp = Math.min(mag, 60) / 60;
-        dx /= mag;
-        dy /= mag;
-        this.cx += dx * this.speed * clamp * dt;
-        this.cy += dy * this.speed * clamp * dt;
+        this.cx += (dx / mag) * this.speed * clamp * dt;
+        this.cy += (dy / mag) * this.speed * clamp * dt;
       }
     }
     const { width, height } = this.game.vp;
@@ -211,45 +233,33 @@ export class CombatScene implements Scene {
     const rng = this.game.rng;
 
     if (wave.boss && !this.bossSpawned && this.elapsed >= 1.5) {
-      const def = ENEMIES[wave.boss];
-      this.boss = this.makeEnemy(def, width / 2, -60);
+      this.boss = this.makeEnemy(ENEMIES[wave.boss], width / 2, -60);
       this.enemies.push(this.boss);
       this.bossSpawned = true;
       this.game.audio.play("boss");
       this.game.addShake(10);
     }
 
-    const spawning = wave.boss ? true : this.timeLeft > 0;
-    if (!spawning) return;
+    if (!wave.boss && this.timeLeft <= 0) return;
 
     wave.spawns.forEach(([id, rate], i) => {
       this.spawnAcc[i] += rate * dt;
       while (this.spawnAcc[i] >= 1) {
         this.spawnAcc[i] -= 1;
-        const def = ENEMIES[id];
         let x = 0;
         let y = 0;
         const edge = rng.int(0, 3);
-        if (edge === 0) {
-          x = rng.range(0, width);
-          y = -30;
-        } else if (edge === 1) {
-          x = width + 30;
-          y = rng.range(0, height);
-        } else if (edge === 2) {
-          x = rng.range(0, width);
-          y = height + 30;
-        } else {
-          x = -30;
-          y = rng.range(0, height);
-        }
-        this.enemies.push(this.makeEnemy(def, x, y));
+        if (edge === 0) [x, y] = [rng.range(0, width), -30];
+        else if (edge === 1) [x, y] = [width + 30, rng.range(0, height)];
+        else if (edge === 2) [x, y] = [rng.range(0, width), height + 30];
+        else [x, y] = [-30, rng.range(0, height)];
+        this.enemies.push(this.makeEnemy(ENEMIES[id], x, y));
       }
     });
   }
 
-  private makeEnemy(def: (typeof ENEMIES)[string], x: number, y: number): Enemy {
-    const scale = 1 + this.game.run.waveIndex * 0.12;
+  private makeEnemy(def: EnemyDef, x: number, y: number): Enemy {
+    const scale = 1 + this.game.run.waveIndex * 0.1;
     return {
       x,
       y,
@@ -261,12 +271,22 @@ export class CombatScene implements Scene {
       contact: def.contactDamage,
       salvage: def.salvage,
       boss: !!def.boss,
+      ai: def.ai ?? "chase",
+      shootRate: def.shootRate ?? 0,
+      shootDmg: def.shootDmg ?? 0,
+      shootRange: def.shootRange ?? 0,
+      splitInto: def.splitInto,
+      splitCount: def.splitCount ?? 0,
       slowT: 0,
       slowF: 1,
       burnDps: 0,
       burnT: 0,
       hitCd: 0,
       flash: 0,
+      shootCd: 1,
+      abilityCd: 4,
+      telegraph: 0,
+      enraged: false,
     };
   }
 
@@ -291,9 +311,8 @@ export class CombatScene implements Scene {
     const radial = w.spread >= Math.PI * 2 - 0.01;
     for (let i = 0; i < w.projectiles; i++) {
       let ang: number;
-      if (radial) {
-        ang = baseAng + (i / w.projectiles) * Math.PI * 2;
-      } else {
+      if (radial) ang = baseAng + (i / w.projectiles) * Math.PI * 2;
+      else {
         const t = w.projectiles > 1 ? i / (w.projectiles - 1) - 0.5 : 0;
         ang = baseAng + t * w.spread;
       }
@@ -308,10 +327,12 @@ export class CombatScene implements Scene {
         element: w.element,
         r: 4 + Math.min(6, w.damage * 0.1),
         color: el.color,
-        life: 1.4,
+        life: 1.5,
         pierce: w.pierce,
         aoe: w.aoe,
         chain: w.chain,
+        homing: w.homing,
+        lifesteal: w.lifesteal,
         burn: w.burn,
         slow: w.slow,
         hit: new Set(),
@@ -322,20 +343,32 @@ export class CombatScene implements Scene {
   private updateProjectiles(dt: number): void {
     const { width, height } = this.game.vp;
     for (const p of this.projectiles) {
+      if (p.homing) {
+        const t = this.nearestEnemy(p.x, p.y, 400);
+        if (t) {
+          const desired = Math.atan2(t.y - p.y, t.x - p.x);
+          const cur = Math.atan2(p.vy, p.vx);
+          const speed = Math.hypot(p.vx, p.vy);
+          let diff = desired - cur;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          const na = cur + Math.max(-6 * dt, Math.min(6 * dt, diff));
+          p.vx = Math.cos(na) * speed;
+          p.vy = Math.sin(na) * speed;
+        }
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.life -= dt;
       for (const e of this.enemies) {
         if (p.hit.has(e) || e.hp <= 0) continue;
-        const rr = (p.r + e.r) ** 2;
-        if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 <= rr) {
-          this.hitEnemy(e, p.dmg, p.crit, p.color, p.element, p.burn, p.slow);
+        if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 <= (p.r + e.r) ** 2) {
+          this.hitEnemy(e, p.dmg, p.crit, p.color, p.element, p.burn, p.slow, p.lifesteal);
           p.hit.add(e);
           if (p.aoe > 0) this.explode(p, e);
           if (p.chain > 0) this.chainTo(p, e);
-          if (p.pierce > 0) {
-            p.pierce -= 1;
-          } else {
+          if (p.pierce > 0) p.pierce -= 1;
+          else {
             p.life = 0;
             break;
           }
@@ -343,11 +376,10 @@ export class CombatScene implements Scene {
       }
     }
     this.projectiles = this.projectiles.filter(
-      (p) => p.life > 0 && p.x > -40 && p.x < width + 40 && p.y > -40 && p.y < height + 40,
+      (p) => p.life > 0 && p.x > -60 && p.x < width + 60 && p.y > -60 && p.y < height + 60,
     );
   }
 
-  /** Core damage application incl. chill amp, status and reactions. */
   private hitEnemy(
     e: Enemy,
     baseDmg: number,
@@ -356,11 +388,11 @@ export class CombatScene implements Scene {
     element: ElementId,
     burn: number,
     slow: number,
+    lifesteal: number,
   ): void {
     const chilled = e.slowT > 0;
     let dmg = baseDmg * (chilled ? CHILL_AMP : 1);
 
-    // Reaction: Volt on a burning enemy → detonate.
     let detonated = false;
     if (element === "volt" && e.burnT > 0) {
       detonated = true;
@@ -372,7 +404,7 @@ export class CombatScene implements Scene {
         if ((o.x - e.x) ** 2 + (o.y - e.y) ** 2 <= 90 * 90) {
           o.hp -= burst * 0.6;
           o.flash = 0.1;
-          if (o.hp <= 0) this.killEnemy(o);
+          if (o.hp <= 0) this.killEnemy(o, lifesteal);
         }
       }
       this.spawnParticles(e.x, e.y, ELEMENT.volt.color, 16);
@@ -393,14 +425,14 @@ export class CombatScene implements Scene {
     this.spawnDamage(e.x, e.y, dmg, crit || detonated, detonated ? ELEMENT.volt.color : crit ? "#ffffff" : color);
     this.spawnParticles(e.x, e.y, color, 3);
     this.game.audio.play("hit");
-    if (e.hp <= 0) this.killEnemy(e);
+    if (e.hp <= 0) this.killEnemy(e, lifesteal);
   }
 
   private explode(p: Projectile, at: Enemy): void {
     for (const e of this.enemies) {
       if (e === at || e.hp <= 0) continue;
       if ((e.x - at.x) ** 2 + (e.y - at.y) ** 2 <= p.aoe * p.aoe) {
-        this.hitEnemy(e, p.dmg * 0.7, false, p.color, p.element, p.burn, 0);
+        this.hitEnemy(e, p.dmg * 0.7, false, p.color, p.element, p.burn, 0, p.lifesteal);
       }
     }
     this.spawnParticles(at.x, at.y, p.color, 10);
@@ -422,19 +454,29 @@ export class CombatScene implements Scene {
       }
       if (!best) break;
       this.chains.push({ x1: src.x, y1: src.y, x2: best.x, y2: best.y, life: 0.12, color: p.color });
-      this.hitEnemy(best, p.dmg * 0.7, p.crit, p.color, p.element, 0, 0);
+      this.hitEnemy(best, p.dmg * 0.7, p.crit, p.color, p.element, 0, 0, p.lifesteal);
       p.hit.add(best);
       src = best;
     }
   }
 
-  private killEnemy(e: Enemy): void {
+  private killEnemy(e: Enemy, lifesteal = 0): void {
     if (e.hp > 0) return;
-    this.game.run.salvage += e.salvage;
+    const run = this.game.run;
+    run.salvage += e.salvage;
+    if (lifesteal > 0) run.hp = Math.min(run.maxHp, run.hp + lifesteal);
     this.overcharge = Math.min(this.overMax, this.overcharge + (e.boss ? 30 : 3));
     this.spawnParticles(e.x, e.y, e.color, e.boss ? 40 : 8);
     this.game.audio.play("kill");
     if (e.boss) this.game.addShake(12);
+
+    if (e.splitInto && e.splitCount > 0) {
+      for (let i = 0; i < e.splitCount; i++) {
+        const a = (i / e.splitCount) * Math.PI * 2;
+        const c = this.makeEnemy(ENEMIES[e.splitInto], e.x + Math.cos(a) * 20, e.y + Math.sin(a) * 20);
+        this.enemies.push(c);
+      }
+    }
     if (e === this.boss) this.boss = null;
   }
 
@@ -443,11 +485,8 @@ export class CombatScene implements Scene {
     for (const e of this.enemies) {
       if (e.hp <= 0) continue;
       if (e.flash > 0) e.flash -= dt;
-      if (e.slowT > 0) {
-        e.slowT -= dt;
-      } else {
-        e.slowF = 1;
-      }
+      if (e.slowT > 0) e.slowT -= dt;
+      else e.slowF = 1;
       if (e.burnT > 0) {
         e.burnT -= dt;
         e.hp -= e.burnDps * dt;
@@ -456,14 +495,23 @@ export class CombatScene implements Scene {
           continue;
         }
       }
+
       const dx = this.cx - e.x;
       const dy = this.cy - e.y;
-      const d = Math.hypot(dx, dy) || 1;
-      e.x += (dx / d) * e.speed * e.slowF * dt;
-      e.y += (dy / d) * e.speed * e.slowF * dt;
+      const dist = Math.hypot(dx, dy) || 1;
+      const nx = dx / dist;
+      const ny = dy / dist;
 
+      if (e.boss) this.updateBoss(e, dt, nx, ny);
+      else if (e.ai === "spitter") this.updateSpitter(e, dt, nx, ny, dist);
+      else {
+        e.x += nx * e.speed * e.slowF * dt;
+        e.y += ny * e.speed * e.slowF * dt;
+      }
+
+      // Contact damage.
       e.hitCd -= dt;
-      if (d <= e.r + this.radius && e.hitCd <= 0) {
+      if (dist <= e.r + this.radius && e.hitCd <= 0) {
         run.hp -= e.contact;
         e.hitCd = 0.6;
         this.spawnParticles(this.cx, this.cy, COLOR.danger, 6);
@@ -472,6 +520,104 @@ export class CombatScene implements Scene {
       }
     }
     this.enemies = this.enemies.filter((e) => e.hp > 0);
+  }
+
+  private updateSpitter(e: Enemy, dt: number, nx: number, ny: number, dist: number): void {
+    const keep = 260;
+    let dir = 0;
+    if (dist > keep + 40) dir = 1;
+    else if (dist < keep - 40) dir = -1;
+    e.x += nx * e.speed * e.slowF * dt * dir;
+    e.y += ny * e.speed * e.slowF * dt * dir;
+    e.shootCd -= dt;
+    if (dist <= e.shootRange && e.shootCd <= 0) {
+      e.shootCd = 1 / e.shootRate;
+      this.enemyShot(e.x, e.y, nx, ny, e.shootDmg, 190);
+    }
+  }
+
+  private updateBoss(e: Enemy, dt: number, nx: number, ny: number): void {
+    // Enrage (overmind).
+    if (e.ai === "overmind" && !e.enraged && e.hp / e.maxHp < 0.4) {
+      e.enraged = true;
+      e.speed *= 1.4;
+      this.game.addShake(10);
+      this.game.audio.play("boss");
+    }
+    e.x += nx * e.speed * e.slowF * dt;
+    e.y += ny * e.speed * e.slowF * dt;
+
+    e.abilityCd -= dt;
+    if (e.telegraph > 0) {
+      e.telegraph -= dt;
+      if (e.telegraph <= 0) this.radialBurst(e);
+      return;
+    }
+    if (e.abilityCd > 0) return;
+
+    const fast = e.enraged ? 0.6 : 1;
+    switch (e.ai) {
+      case "reclaimer":
+        this.summonAdds(e, 3);
+        e.abilityCd = 5 * fast;
+        break;
+      case "harvester":
+        e.telegraph = 0.7;
+        e.abilityCd = 3.6 * fast;
+        break;
+      case "overmind":
+        if (this.game.rng.next() < 0.5) {
+          this.summonAdds(e, 3);
+          e.abilityCd = 4 * fast;
+        } else {
+          e.telegraph = 0.6;
+          e.abilityCd = 3.2 * fast;
+        }
+        break;
+    }
+  }
+
+  private summonAdds(e: Enemy, n: number): void {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + this.game.rng.next();
+      const add = this.makeEnemy(ENEMIES.rusher, e.x + Math.cos(a) * (e.r + 20), e.y + Math.sin(a) * (e.r + 20));
+      this.enemies.push(add);
+    }
+    this.spawnParticles(e.x, e.y, e.color, 14);
+  }
+
+  private radialBurst(e: Enemy): void {
+    const count = e.enraged ? 18 : 12;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      this.enemyShot(e.x, e.y, Math.cos(a), Math.sin(a), e.shootDmg, 210);
+    }
+    this.game.addShake(6);
+    this.spawnParticles(e.x, e.y, e.color, 20);
+  }
+
+  private enemyShot(x: number, y: number, nx: number, ny: number, dmg: number, speed: number): void {
+    this.enemyShots.push({ x, y, vx: nx * speed, vy: ny * speed, dmg, life: 4 });
+  }
+
+  private updateEnemyShots(dt: number): void {
+    const { width, height } = this.game.vp;
+    const run = this.game.run;
+    for (const s of this.enemyShots) {
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.life -= dt;
+      if ((s.x - this.cx) ** 2 + (s.y - this.cy) ** 2 <= (this.radius + 6) ** 2) {
+        run.hp -= s.dmg;
+        s.life = 0;
+        this.spawnParticles(this.cx, this.cy, COLOR.danger, 6);
+        this.game.audio.play("hurt");
+        this.game.addShake(4);
+      }
+    }
+    this.enemyShots = this.enemyShots.filter(
+      (s) => s.life > 0 && s.x > -20 && s.x < width + 20 && s.y > -20 && s.y < height + 20,
+    );
   }
 
   private nearestEnemy(x: number, y: number, range: number): Enemy | null {
@@ -497,9 +643,13 @@ export class CombatScene implements Scene {
     const dmg = 40 + this.game.run.waveIndex * 12;
     for (const e of this.enemies) {
       if ((e.x - this.cx) ** 2 + (e.y - this.cy) ** 2 <= 240 * 240) {
-        this.hitEnemy(e, dmg, true, COLOR.amber, "kinetic", 0, 0);
+        this.hitEnemy(e, dmg, true, COLOR.amber, "kinetic", 0, 0, 0);
       }
     }
+    // Clear nearby enemy bullets.
+    this.enemyShots = this.enemyShots.filter(
+      (s) => (s.x - this.cx) ** 2 + (s.y - this.cy) ** 2 > 240 * 240,
+    );
     this.spawnParticles(this.cx, this.cy, COLOR.amber, 50);
   }
 
@@ -574,7 +724,6 @@ export class CombatScene implements Scene {
       ctx.stroke();
     }
 
-    // Chain flashes.
     for (const c of this.chains) {
       ctx.strokeStyle = c.color;
       ctx.globalAlpha = Math.max(0, c.life / 0.12);
@@ -586,8 +735,17 @@ export class CombatScene implements Scene {
     }
     ctx.globalAlpha = 1;
 
-    // Enemies.
     for (const e of this.enemies) {
+      // Telegraph ring before a boss burst.
+      if (e.telegraph > 0) {
+        ctx.strokeStyle = COLOR.danger;
+        ctx.globalAlpha = 0.4 + 0.4 * Math.sin(this.elapsed * 30);
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r + 14, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       ctx.fillStyle = e.flash > 0 ? "#ffffff" : e.burnT > 0 ? "#ff8a3d" : e.color;
       ctx.beginPath();
       ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
@@ -603,12 +761,22 @@ export class CombatScene implements Scene {
         ctx.fillStyle = "#000";
         ctx.fill();
         roundRect(ctx, e.x - e.r, e.y - e.r - 12, bw * Math.max(0, e.hp / e.maxHp), 6, 3);
-        ctx.fillStyle = COLOR.danger;
+        ctx.fillStyle = e.enraged ? "#ff2d3e" : COLOR.danger;
         ctx.fill();
       }
     }
 
-    // Projectiles.
+    // Enemy bullets.
+    for (const s of this.enemyShots) {
+      ctx.fillStyle = "#ff6b7a";
+      ctx.shadowColor = "#ff4d5e";
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
     for (const p of this.projectiles) {
       ctx.fillStyle = p.color;
       ctx.shadowColor = p.color;
@@ -619,7 +787,6 @@ export class CombatScene implements Scene {
     }
     ctx.shadowBlur = 0;
 
-    // Particles.
     for (const p of this.particles) {
       ctx.globalAlpha = Math.max(0, p.life / p.max);
       ctx.fillStyle = p.color;
@@ -627,7 +794,6 @@ export class CombatScene implements Scene {
     }
     ctx.globalAlpha = 1;
 
-    // Damage numbers.
     for (const f of this.floaters) {
       ctx.globalAlpha = Math.min(1, f.life * 3);
       text(ctx, f.text, f.x, f.y, { size: f.size, color: f.color, align: "center", weight: "800" });
@@ -644,8 +810,8 @@ export class CombatScene implements Scene {
       ctx.arc(this.joyOx, this.joyOy, 60, 0, Math.PI * 2);
       ctx.stroke();
       ctx.fillStyle = COLOR.amber;
-      let dx = this.joyX - this.joyOx;
-      let dy = this.joyY - this.joyOy;
+      const dx = this.joyX - this.joyOx;
+      const dy = this.joyY - this.joyOy;
       const mag = Math.hypot(dx, dy) || 1;
       const c = Math.min(mag, 60);
       ctx.beginPath();
@@ -655,6 +821,26 @@ export class CombatScene implements Scene {
     }
 
     this.renderHud();
+    if (this.game.tutorialActive) this.renderTutorial();
+  }
+
+  private renderTutorial(): void {
+    const { ctx, width, height } = this.game.vp;
+    let msg = "";
+    if (this.elapsed < 4.5) msg = "Hold anywhere to steer. Weapons fire on their own.";
+    else if (this.overcharge >= this.overMax) msg = "Overcharge ready — tap the ⚡ button!";
+    else if (this.elapsed < 9) msg = "Survive the timer. Fill the OC ring by killing enemies.";
+    if (!msg) return;
+    const w = Math.min(width - 32, 360);
+    const x = width / 2 - w / 2;
+    const y = height - 150;
+    roundRect(ctx, x, y, w, 40, 10);
+    ctx.fillStyle = "rgba(13,17,23,0.9)";
+    ctx.fill();
+    ctx.strokeStyle = COLOR.amber;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    text(ctx, msg, width / 2, y + 20, { size: 13, color: COLOR.text, align: "center", baseline: "middle" });
   }
 
   private renderChassis(): void {
@@ -717,8 +903,8 @@ export class CombatScene implements Scene {
         align: "right",
         weight: "800",
       });
-    } else {
-      text(ctx, "DESTROY THE RECLAIMER", width - pad, 54, {
+    } else if (this.boss) {
+      text(ctx, this.boss.enraged ? "ENRAGED!" : "BOSS", width - pad, 54, {
         size: 13,
         color: COLOR.danger,
         align: "right",

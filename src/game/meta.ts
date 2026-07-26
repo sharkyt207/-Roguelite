@@ -27,6 +27,7 @@ export interface MetaSave {
   selectedChassis: string;
   unlockedBlueprints: string[];
   muted: boolean;
+  seenTutorial: boolean;
   stats: { runs: number; wins: number; bestWave: number };
 }
 
@@ -60,6 +61,7 @@ export const BLUEPRINTS: Array<{ id: string; cost: number }> = [
   { id: "overclocker", cost: 8 },
   { id: "catalyst", cost: 10 },
   { id: "splitter", cost: 10 },
+  { id: "flamethrower", cost: 12 },
 ];
 
 export function defaultSave(): MetaSave {
@@ -70,6 +72,7 @@ export function defaultSave(): MetaSave {
     selectedChassis: "scrapheap",
     unlockedBlueprints: [],
     muted: false,
+    seenTutorial: false,
     stats: { runs: 0, wins: 0, bestWave: 0 },
   };
 }

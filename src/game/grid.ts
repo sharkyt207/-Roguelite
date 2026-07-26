@@ -41,6 +41,8 @@ export interface ResolvedWeapon {
   aoe: number;
   pierce: number;
   crit: number;
+  homing: boolean;
+  lifesteal: number;
   burn: number;
   slow: number;
 }
@@ -169,6 +171,9 @@ export class Grid {
       let slow = 0;
       let rangeAdd = 0;
       let crit = d.weapon.crit;
+      let pierceAdd = 0;
+      let projectilesAdd = 0;
+      let lifesteal = 0;
 
       for (const [dx, dy] of DIRS) {
         const n = this.at(c.x + dx, c.y + dy);
@@ -183,10 +188,16 @@ export class Grid {
         if (s.slow) slow = Math.min(0.9, Math.max(slow, s.slow * p));
         if (s.critAdd) crit += s.critAdd * p;
         if (s.rangeAdd) rangeAdd += s.rangeAdd * p;
+        if (s.pierceAdd) pierceAdd += Math.round(s.pierceAdd * p);
+        if (s.projectilesAdd) projectilesAdd += Math.round(s.projectilesAdd * p);
+        if (s.lifesteal) lifesteal = Math.max(lifesteal, s.lifesteal * p);
       }
 
       const w = d.weapon;
       const m = this.mods;
+      const projectiles = w.projectiles + projectilesAdd;
+      // Multishot fans out even single-shot weapons.
+      const spread = w.spread === 0 && projectiles > 1 ? 0.35 : w.spread;
       out.push({
         x: c.x,
         y: c.y,
@@ -196,12 +207,14 @@ export class Grid {
         fireRate: w.fireRate * fireRateMult * (m.fireRateMult ?? 1),
         range: w.range + rangeAdd + (m.rangeAdd ?? 0),
         projectileSpeed: w.projectileSpeed,
-        projectiles: w.projectiles,
-        spread: w.spread,
+        projectiles,
+        spread,
         chain: w.chain,
         aoe: w.aoe,
-        pierce: w.pierce,
+        pierce: w.pierce + pierceAdd,
         crit: Math.min(0.9, crit),
+        homing: w.homing,
+        lifesteal,
         burn,
         slow,
       });

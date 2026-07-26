@@ -15,19 +15,34 @@ export interface WaveDef {
 }
 
 export const WAVES: WaveDef[] = [
-  { duration: 30, label: "Sector 1 · Wave 1", spawns: [["rusher", 1.1]] },
-  { duration: 34, label: "Sector 1 · Wave 2", spawns: [["rusher", 1.3], ["grunt", 0.4]] },
-  { duration: 38, label: "Sector 2 · Wave 3", spawns: [["rusher", 1.4], ["grunt", 0.7]] },
+  // ---- Sector 1 ----
+  { duration: 28, label: "Sector 1 · Wave 1", spawns: [["rusher", 1.1]] },
+  { duration: 32, label: "Sector 1 · Wave 2", spawns: [["rusher", 1.3], ["grunt", 0.4]] },
+  { duration: 55, label: "Sector 1 · RECLAIMER", spawns: [["rusher", 0.8]], boss: "reclaimer" },
+  // ---- Sector 2 ----
+  { duration: 34, label: "Sector 2 · Wave 4", spawns: [["grunt", 0.7], ["spitter", 0.35]] },
   {
-    duration: 42,
-    label: "Sector 2 · Wave 4",
-    spawns: [["rusher", 1.6], ["grunt", 0.9], ["tank", 0.18]],
+    duration: 38,
+    label: "Sector 2 · Wave 5",
+    spawns: [["rusher", 1.1], ["brood", 0.35], ["tank", 0.16]],
   },
   {
-    duration: 60,
-    label: "Sector 3 · BOSS",
-    spawns: [["rusher", 1.0], ["grunt", 0.5]],
-    boss: "boss",
+    duration: 58,
+    label: "Sector 2 · HARVESTER",
+    spawns: [["spitter", 0.3], ["rusher", 0.6]],
+    boss: "harvester",
+  },
+  // ---- Sector 3 ----
+  {
+    duration: 42,
+    label: "Sector 3 · Wave 7",
+    spawns: [["rusher", 1.2], ["grunt", 0.6], ["spitter", 0.4], ["brood", 0.3], ["tank", 0.14]],
+  },
+  {
+    duration: 70,
+    label: "Sector 3 · THE OVERMIND",
+    spawns: [["rusher", 0.7], ["spitter", 0.25]],
+    boss: "overmind",
   },
 ];
 
