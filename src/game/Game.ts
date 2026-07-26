@@ -73,6 +73,7 @@ export class Game {
     run.salvage = s.salvage;
     run.waveIndex = s.waveIndex;
     run.inventory = [...s.inventory];
+    run.endless = s.endless ?? false;
     this.run = run;
     this.tutorialActive = false;
     return true;
@@ -114,14 +115,19 @@ export class Game {
       this.shake = 0;
     }
 
-    // If a scene switches during update, defer the new scene's first render to
-    // next frame so its update (layout) always runs before it renders.
-    const active = this.scene;
-    active.update(dt);
-    if (this.scene === active) this.scene.render();
-    ctx.restore();
-
-    this.input.endFrame();
-    requestAnimationFrame(this.frame);
+    try {
+      // If a scene switches during update, defer the new scene's first render
+      // to next frame so its update (layout) always runs before it renders.
+      const active = this.scene;
+      active.update(dt);
+      if (this.scene === active) this.scene.render();
+    } catch (err) {
+      // A single bad frame must never freeze the whole game.
+      console.error("Frame error:", err);
+    } finally {
+      ctx.restore();
+      this.input.endFrame();
+      requestAnimationFrame(this.frame);
+    }
   };
 }

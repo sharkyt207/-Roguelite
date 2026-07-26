@@ -16,6 +16,7 @@ export interface RunSnapshot {
   inventory: string[];
   cells: Array<{ x: number; y: number; comp: string }>;
   daily: boolean;
+  endless: boolean;
   modifierId?: string;
 }
 
@@ -29,6 +30,7 @@ export function saveRun(run: RunState): void {
     inventory: [...run.inventory],
     cells: run.grid.snapshot(),
     daily: run.daily,
+    endless: run.endless,
     modifierId: run.modifier?.id,
   };
   try {

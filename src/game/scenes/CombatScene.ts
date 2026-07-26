@@ -733,6 +733,7 @@ export class CombatScene implements Scene {
   private completeWave(): void {
     const run = this.game.run;
     this.game.meta.stats.bestWave = Math.max(this.game.meta.stats.bestWave, run.waveIndex + 1);
+    if (run.endless) this.game.meta.stats.bestDepth = Math.max(this.game.meta.stats.bestDepth, run.depth);
     if (run.isLastWave) {
       this.game.setScene(new EndScene(this.game, true));
       return;

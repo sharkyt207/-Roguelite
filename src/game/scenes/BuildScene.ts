@@ -127,6 +127,10 @@ export class BuildScene implements Scene {
         this.finalizeDrop();
       }
     }
+
+    // Re-sync layout after any inventory mutation this frame so the tray
+    // geometry matches the current inventory before render() runs.
+    this.layout();
   }
 
   private finalizeDrop(): void {

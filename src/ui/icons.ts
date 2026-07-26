@@ -15,6 +15,7 @@ export function drawComponentIcon(
   size: number,
   powered: boolean,
 ): void {
+  if (!def) return; // never let a bad id crash the render loop
   const el = ELEMENT[def.element as ElementId];
   const r = size * 0.5;
   ctx.save();

@@ -57,6 +57,8 @@ export class RunState {
   chassisId: string;
   daily: boolean;
   modifier?: DailyModifier;
+  /** Endless "The Deep" mode, entered after beating the final boss. */
+  endless = false;
 
   constructor(meta: MetaSave, modifier?: DailyModifier, chassisId?: string) {
     const chassis = CHASSIS[chassisId ?? meta.selectedChassis] ?? CHASSIS.scrapheap;
@@ -77,11 +79,38 @@ export class RunState {
     for (const [x, y, id] of chassis.start) this.grid.place(x, y, id);
   }
 
+  /** In endless mode there is no "last" wave. */
   get isLastWave(): boolean {
-    return this.waveIndex >= WAVES.length - 1;
+    return !this.endless && this.waveIndex >= WAVES.length - 1;
   }
 
   get currentWave(): WaveDef {
-    return WAVES[this.waveIndex];
+    return this.waveAt(this.waveIndex);
+  }
+
+  /** Current endless depth (0 before entering The Deep). */
+  get depth(): number {
+    return Math.max(0, this.waveIndex - WAVES.length + 1);
+  }
+
+  /** Wave definition for an index, generating escalating endless waves past the campaign. */
+  waveAt(i: number): WaveDef {
+    if (i < WAVES.length) return WAVES[i];
+    const depth = i - WAVES.length + 1;
+    const s = depth * 0.12;
+    const bossCycle = ["reclaimer", "harvester", "overmind"];
+    const isBoss = depth % 3 === 0;
+    return {
+      duration: 40,
+      label: isBoss ? `The Deep · Depth ${depth} · BOSS` : `The Deep · Depth ${depth}`,
+      spawns: [
+        ["rusher", 1.3 + s],
+        ["grunt", 0.7 + s * 0.6],
+        ["spitter", 0.4 + s * 0.4],
+        ["brood", 0.35 + s * 0.4],
+        ["tank", 0.16 + s * 0.2],
+      ],
+      boss: isBoss ? bossCycle[(depth / 3 - 1) % bossCycle.length] : undefined,
+    };
   }
 }

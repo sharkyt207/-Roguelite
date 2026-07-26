@@ -29,7 +29,7 @@ export interface MetaSave {
   muted: boolean;
   seenTutorial: boolean;
   daily: { date: string; bestWave: number; won: boolean } | null;
-  stats: { runs: number; wins: number; bestWave: number };
+  stats: { runs: number; wins: number; bestWave: number; bestDepth: number };
 }
 
 export const UPGRADES: UpgradeDef[] = [
@@ -80,7 +80,7 @@ export function defaultSave(): MetaSave {
     muted: false,
     seenTutorial: false,
     daily: null,
-    stats: { runs: 0, wins: 0, bestWave: 0 },
+    stats: { runs: 0, wins: 0, bestWave: 0, bestDepth: 0 },
   };
 }
 
@@ -89,7 +89,13 @@ export function loadMeta(): MetaSave {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return defaultSave();
     const parsed = JSON.parse(raw) as Partial<MetaSave>;
-    return { ...defaultSave(), ...parsed, upgrades: { ...defaultSave().upgrades, ...parsed.upgrades } };
+    const base = defaultSave();
+    return {
+      ...base,
+      ...parsed,
+      upgrades: { ...base.upgrades, ...parsed.upgrades },
+      stats: { ...base.stats, ...parsed.stats },
+    };
   } catch {
     return defaultSave();
   }

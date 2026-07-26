@@ -179,7 +179,20 @@ Landschaft werden zu wanderndem Schrott. Du überlebst, indem du aus Salvage ein
 - **Portierung:** bei Bedarf später Godot/Unity; Datenmodell (Komponenten/Adjazenz) ist
   engine-unabhängig gehalten.
 
-## Prototyp-Status (v0.4 — lauffähig)
+## Prototyp-Status (v0.4.1 — lauffähig)
+
+**Bugfix (kritisch):** Build-Phase-Drag & Drop war blockiert. Ursache: beim Aufheben
+eines Teils wurde `inventory` gekürzt, aber `trayRects` behielt die alte Länge → im
+selben Frame las `render()` `inventory[i] === undefined` und `drawComponentIcon` warf
+eine Exception, die die gesamte requestAnimationFrame-Schleife stoppte (Spiel „eingefroren").
+Fix: Layout nach Input-Mutationen neu berechnen, `drawComponentIcon` null-sicher, und der
+Game-Loop fängt Frame-Fehler jetzt ab (ein defekter Frame friert nie mehr das ganze Spiel ein).
+
+**Endless-Modus „The Deep":** Nach dem Sieg über den Overmind optionaler Abstieg in
+endlose, eskalierende Wellen (prozedural, Boss alle 3 Tiefen). Tiefen-Bestwert & Bonus-Cores
+je Tiefe; wird in Speicher & Persistenz berücksichtigt.
+
+### Frühere Meilensteine (v0.4)
 
 **Balancing (datenbasiert):** Headless-Simulator `tools/balance-sim.ts` (`npm run sim`)
 nutzt die *echten* Auflösungs-/Daten-Module und berechnet Build-DPS, Wellen-Clear-Ratio

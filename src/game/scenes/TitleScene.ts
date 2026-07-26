@@ -141,12 +141,13 @@ export class TitleScene implements Scene {
     }
 
     if (meta.stats.wins > 0) {
-      text(ctx, `Wins ${meta.stats.wins}  ·  Best wave ${meta.stats.bestWave}`, cx, height - 40, {
+      const deep = meta.stats.bestDepth > 0 ? `  ·  Deepest ${meta.stats.bestDepth}` : "";
+      text(ctx, `Wins ${meta.stats.wins}  ·  Best wave ${meta.stats.bestWave}${deep}`, cx, height - 40, {
         size: 12,
         color: COLOR.textDim,
         align: "center",
       });
     }
-    text(ctx, "Prototype v0.4", cx, height - 20, { size: 11, color: COLOR.textDim, align: "center" });
+    text(ctx, "Prototype v0.4.1", cx, height - 20, { size: 11, color: COLOR.textDim, align: "center" });
   }
 }
