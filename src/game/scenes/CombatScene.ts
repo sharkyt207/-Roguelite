@@ -15,9 +15,10 @@ import type { Game, Scene } from "../Game";
 import { COLOR, ELEMENT, type ElementId } from "../../core/theme";
 import { ENEMIES, type EnemyAI, type EnemyDef } from "../enemies";
 import type { ResolvedWeapon } from "../grid";
-import { roundRect, text } from "../../ui/draw";
+import { roundRect, text, button, pointInRect, type Rect } from "../../ui/draw";
 import { RewardScene } from "./RewardScene";
 import { EndScene } from "./EndScene";
+import { TitleScene } from "./TitleScene";
 
 const CHILL_AMP = 1.35;
 const CRIT_MULT = 2;
@@ -137,11 +138,16 @@ export class CombatScene implements Scene {
   private joyY = 0;
 
   private overBtn = { x: 0, y: 0, r: 44 };
+  private pauseBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
+  private resumeBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
+  private abandonBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
+  private paused = false;
 
   constructor(private game: Game) {
     const { width, height } = game.vp;
     this.cx = width / 2;
     this.cy = height / 2;
+    this.speed = 190 * (game.run.grid.mods.moveSpeedMult ?? 1);
     const wave = game.run.currentWave;
     this.timeLeft = wave.duration;
     this.spawnAcc = wave.spawns.map(() => 0);
@@ -159,6 +165,12 @@ export class CombatScene implements Scene {
   update(dt: number): void {
     const { width, height } = this.game.vp;
     this.overBtn = { x: width - 64, y: height - 84, r: 44 };
+    this.pauseBtn = { x: 14, y: 88, w: 44, h: 32 };
+
+    if (this.paused) {
+      this.updatePauseMenu();
+      return;
+    }
 
     this.elapsed += dt;
     this.handleInput();
@@ -187,10 +199,32 @@ export class CombatScene implements Scene {
     void height;
   }
 
+  private updatePauseMenu(): void {
+    const { width, height } = this.game.vp;
+    this.resumeBtn = { x: width / 2 - 120, y: height * 0.46, w: 240, h: 56 };
+    this.abandonBtn = { x: width / 2 - 120, y: height * 0.46 + 70, w: 240, h: 52 };
+    for (const p of this.game.input.active) {
+      if (!p.justPressed) continue;
+      if (pointInRect(p.x, p.y, this.resumeBtn)) {
+        this.paused = false;
+        this.game.audio.play("ui");
+      } else if (pointInRect(p.x, p.y, this.abandonBtn)) {
+        this.game.audio.play("ui");
+        this.game.endRun();
+        this.game.setScene(new TitleScene(this.game));
+      }
+    }
+  }
+
   private handleInput(): void {
     const input = this.game.input;
     for (const p of input.active) {
       if (!p.justPressed) continue;
+      if (pointInRect(p.x, p.y, this.pauseBtn)) {
+        this.paused = true;
+        this.game.audio.play("ui");
+        continue;
+      }
       const dx = p.x - this.overBtn.x;
       const dy = p.y - this.overBtn.y;
       if (dx * dx + dy * dy <= (this.overBtn.r + 8) ** 2) {
@@ -242,8 +276,9 @@ export class CombatScene implements Scene {
 
     if (!wave.boss && this.timeLeft <= 0) return;
 
+    const spawnMult = this.game.run.modifier?.spawnRateMult ?? 1;
     wave.spawns.forEach(([id, rate], i) => {
-      this.spawnAcc[i] += rate * dt;
+      this.spawnAcc[i] += rate * spawnMult * dt;
       while (this.spawnAcc[i] >= 1) {
         this.spawnAcc[i] -= 1;
         let x = 0;
@@ -259,7 +294,7 @@ export class CombatScene implements Scene {
   }
 
   private makeEnemy(def: EnemyDef, x: number, y: number): Enemy {
-    const scale = 1 + this.game.run.waveIndex * 0.1;
+    const scale = (1 + this.game.run.waveIndex * 0.1) * (this.game.run.modifier?.enemyHpMult ?? 1);
     return {
       x,
       y,
@@ -300,14 +335,15 @@ export class CombatScene implements Scene {
         rt.cd = 0.05;
         continue;
       }
-      rt.cd += 1 / rt.w.fireRate;
+      rt.cd += 1 / (rt.w.fireRate * (this.game.run.modifier?.fireRateMult ?? 1));
       this.fire(rt.w, target);
     }
   }
 
   private fire(w: ResolvedWeapon, target: Enemy): void {
     const baseAng = Math.atan2(target.y - this.cy, target.x - this.cx);
-    const el = ELEMENT[w.element];
+    const element = this.game.run.modifier?.forceElement ?? w.element;
+    const el = ELEMENT[element];
     const radial = w.spread >= Math.PI * 2 - 0.01;
     for (let i = 0; i < w.projectiles; i++) {
       let ang: number;
@@ -317,6 +353,8 @@ export class CombatScene implements Scene {
         ang = baseAng + t * w.spread;
       }
       const crit = this.game.rng.next() < w.crit;
+      // Inferno modifier ignites weapons that don't already burn.
+      const burn = element === "ember" && w.burn === 0 ? 5 : w.burn;
       this.projectiles.push({
         x: this.cx,
         y: this.cy,
@@ -324,7 +362,7 @@ export class CombatScene implements Scene {
         vy: Math.sin(ang) * w.projectileSpeed,
         dmg: w.damage * (crit ? CRIT_MULT : 1),
         crit,
-        element: w.element,
+        element,
         r: 4 + Math.min(6, w.damage * 0.1),
         color: el.color,
         life: 1.5,
@@ -333,7 +371,7 @@ export class CombatScene implements Scene {
         chain: w.chain,
         homing: w.homing,
         lifesteal: w.lifesteal,
-        burn: w.burn,
+        burn,
         slow: w.slow,
         hit: new Set(),
       });
@@ -463,9 +501,10 @@ export class CombatScene implements Scene {
   private killEnemy(e: Enemy, lifesteal = 0): void {
     if (e.hp > 0) return;
     const run = this.game.run;
-    run.salvage += e.salvage;
+    const mod = run.modifier;
+    run.salvage += Math.max(1, Math.round(e.salvage * (mod?.salvageMult ?? 1)));
     if (lifesteal > 0) run.hp = Math.min(run.maxHp, run.hp + lifesteal);
-    this.overcharge = Math.min(this.overMax, this.overcharge + (e.boss ? 30 : 3));
+    this.overcharge = Math.min(this.overMax, this.overcharge + (e.boss ? 30 : 3) * (mod?.overchargeMult ?? 1));
     this.spawnParticles(e.x, e.y, e.color, e.boss ? 40 : 8);
     this.game.audio.play("kill");
     if (e.boss) this.game.addShake(12);
@@ -822,6 +861,21 @@ export class CombatScene implements Scene {
 
     this.renderHud();
     if (this.game.tutorialActive) this.renderTutorial();
+    if (this.paused) this.renderPause();
+  }
+
+  private renderPause(): void {
+    const { ctx, width, height } = this.game.vp;
+    ctx.fillStyle = "rgba(5,7,10,0.82)";
+    ctx.fillRect(0, 0, width, height);
+    text(ctx, "PAUSED", width / 2, height * 0.36, {
+      size: 34,
+      color: COLOR.text,
+      align: "center",
+      weight: "900",
+    });
+    button(ctx, this.resumeBtn, "▶  RESUME");
+    button(ctx, this.abandonBtn, "ABANDON RUN", { color: COLOR.metal, textColor: COLOR.text });
   }
 
   private renderTutorial(): void {
@@ -872,13 +926,19 @@ export class CombatScene implements Scene {
     ctx.fill();
     ctx.restore();
 
-    const els = this.weapons.map((w) => w.w.element);
+    // Weapon barrels — a small silhouette per equipped weapon, coloured by element.
+    const els = this.game.run.modifier?.forceElement
+      ? this.weapons.map(() => this.game.run.modifier!.forceElement!)
+      : this.weapons.map((w) => w.w.element);
     els.forEach((el, i) => {
-      const a = (i / Math.max(1, els.length)) * Math.PI * 2;
+      const a = (i / Math.max(1, els.length)) * Math.PI * 2 - Math.PI / 2;
+      ctx.save();
+      ctx.translate(this.cx, this.cy);
+      ctx.rotate(a + Math.PI / 2);
       ctx.fillStyle = ELEMENT[el].color;
-      ctx.beginPath();
-      ctx.arc(this.cx + Math.cos(a) * (this.radius + 6), this.cy + Math.sin(a) * (this.radius + 6), 3, 0, Math.PI * 2);
+      roundRect(ctx, -2.5, -(this.radius + 10), 5, 12, 2);
       ctx.fill();
+      ctx.restore();
     });
   }
 
@@ -912,6 +972,21 @@ export class CombatScene implements Scene {
       });
     }
     text(ctx, `Salvage ${run.salvage}`, pad, 74, { size: 13, color: COLOR.amber });
+    if (run.modifier) {
+      text(ctx, `◆ ${run.modifier.name}`, width / 2, 74, { size: 12, color: COLOR.energy, align: "center" });
+    }
+
+    // Pause button.
+    roundRect(ctx, this.pauseBtn.x, this.pauseBtn.y, this.pauseBtn.w, this.pauseBtn.h, 8);
+    ctx.fillStyle = COLOR.bgPanel2;
+    ctx.fill();
+    text(ctx, "II", this.pauseBtn.x + this.pauseBtn.w / 2, this.pauseBtn.y + this.pauseBtn.h / 2, {
+      size: 15,
+      color: COLOR.text,
+      align: "center",
+      baseline: "middle",
+      weight: "800",
+    });
 
     const b = this.overBtn;
     const ready = this.overcharge >= this.overMax;

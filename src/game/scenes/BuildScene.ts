@@ -11,6 +11,7 @@ import { COLOR, ELEMENT } from "../../core/theme";
 import { COMPONENTS } from "../components";
 import { button, pointInRect, roundRect, text, type Rect } from "../../ui/draw";
 import { drawComponentIcon } from "../../ui/icons";
+import { saveRun } from "../persistence";
 import { CombatScene } from "./CombatScene";
 
 interface Drag {
@@ -31,7 +32,10 @@ export class BuildScene implements Scene {
   private deployBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
   private drag: Drag | null = null;
 
-  constructor(private game: Game) {}
+  constructor(private game: Game) {
+    // Checkpoint: persist the run so it can be resumed after closing the tab.
+    saveRun(game.run);
+  }
 
   private layout(): void {
     const { width, height } = this.game.vp;

@@ -1,34 +1,87 @@
 import type { Game, Scene } from "../Game";
 import { COLOR } from "../../core/theme";
 import { CHASSIS } from "../chassis";
+import { dailyFor } from "../daily";
+import { loadRun } from "../persistence";
+import { todayKey } from "../daily";
 import { button, pointInRect, text, type Rect } from "../../ui/draw";
 import { BuildScene } from "./BuildScene";
 import { WorkshopScene } from "./WorkshopScene";
+import { EncyclopediaScene } from "./EncyclopediaScene";
+
+interface Btn {
+  rect: Rect;
+  label: string;
+  primary: boolean;
+  action: () => void;
+}
 
 export class TitleScene implements Scene {
-  private playBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
-  private shopBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
+  private btns: Btn[] = [];
   private t = 0;
 
   constructor(private game: Game) {}
 
   update(dt: number): void {
     this.t += dt;
-    const { width, height } = this.game.vp;
-    this.playBtn = { x: width / 2 - 130, y: height * 0.6, w: 260, h: 64 };
-    this.shopBtn = { x: width / 2 - 130, y: height * 0.6 + 78, w: 260, h: 58 };
-
+    this.layout();
     for (const p of this.game.input.active) {
       if (!p.justPressed) continue;
       this.game.audio.resume();
-      if (pointInRect(p.x, p.y, this.playBtn)) {
-        this.game.audio.play("ui");
-        this.game.newRun();
-        this.game.setScene(new BuildScene(this.game));
-      } else if (pointInRect(p.x, p.y, this.shopBtn)) {
-        this.game.audio.play("ui");
-        this.game.setScene(new WorkshopScene(this.game));
+      for (const b of this.btns) {
+        if (pointInRect(p.x, p.y, b.rect)) {
+          this.game.audio.play("ui");
+          b.action();
+          return;
+        }
       }
+    }
+  }
+
+  private layout(): void {
+    const { width, height } = this.game.vp;
+    const g = this.game;
+    const w = 260;
+    const x = width / 2 - w / 2;
+    const h = 54;
+    const gap = 10;
+
+    this.btns = [];
+    const defs: Array<Omit<Btn, "rect">> = [];
+
+    if (loadRun()) {
+      defs.push({
+        label: "▶  CONTINUE",
+        primary: true,
+        action: () => {
+          if (g.resumeRun()) g.setScene(new BuildScene(g));
+        },
+      });
+    }
+    defs.push({
+      label: "＋  NEW RUN",
+      primary: !loadRun(),
+      action: () => {
+        g.newRun();
+        g.setScene(new BuildScene(g));
+      },
+    });
+    defs.push({
+      label: "◷  DAILY RUN",
+      primary: false,
+      action: () => {
+        g.newDailyRun();
+        g.setScene(new BuildScene(g));
+      },
+    });
+    defs.push({ label: "◆  WORKSHOP", primary: false, action: () => g.setScene(new WorkshopScene(g)) });
+    defs.push({ label: "❔  ENCYCLOPEDIA", primary: false, action: () => g.setScene(new EncyclopediaScene(g)) });
+
+    const totalH = defs.length * h + (defs.length - 1) * gap;
+    let y = Math.max(height * 0.44, height / 2 - totalH / 2 + 40);
+    for (const d of defs) {
+      this.btns.push({ ...d, rect: { x, y, w, h } });
+      y += h + gap;
     }
   }
 
@@ -41,47 +94,59 @@ export class TitleScene implements Scene {
     ctx.strokeStyle = COLOR.gridLine;
     ctx.lineWidth = 1;
     const step = 44;
-    ctx.globalAlpha = 0.25;
-    for (let x = (this.t * 8) % step; x < width; x += step) {
+    ctx.globalAlpha = 0.22;
+    for (let gx = (this.t * 8) % step; gx < width; gx += step) {
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
+      ctx.moveTo(gx, 0);
+      ctx.lineTo(gx, height);
       ctx.stroke();
     }
-    for (let y = 0; y < height; y += step) {
+    for (let gy = 0; gy < height; gy += step) {
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
+      ctx.moveTo(0, gy);
+      ctx.lineTo(width, gy);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
-    text(ctx, "GRID", cx, height * 0.3, { size: 72, color: COLOR.text, align: "center", baseline: "middle", weight: "900" });
-    text(ctx, "FORGE", cx, height * 0.3 + 66, { size: 72, color: COLOR.amber, align: "center", baseline: "middle", weight: "900" });
-    text(ctx, "Build the machine. Survive the salvage.", cx, height * 0.3 + 122, {
-      size: 15,
+    const top = height * 0.15;
+    text(ctx, "GRID", cx, top, { size: 64, color: COLOR.text, align: "center", baseline: "middle", weight: "900" });
+    text(ctx, "FORGE", cx, top + 58, { size: 64, color: COLOR.amber, align: "center", baseline: "middle", weight: "900" });
+    text(ctx, "Build the machine. Survive the salvage.", cx, top + 108, {
+      size: 14,
       color: COLOR.textDim,
       align: "center",
       baseline: "middle",
     });
 
-    // Meta status line.
     const chassis = CHASSIS[meta.selectedChassis] ?? CHASSIS.scrapheap;
-    text(ctx, `◆ ${meta.cores} Cores   ·   Chassis: ${chassis.name}`, cx, height * 0.48, {
-      size: 14,
+    text(ctx, `◆ ${meta.cores} Cores   ·   ${chassis.name}`, cx, top + 140, {
+      size: 13,
       color: COLOR.energy,
       align: "center",
     });
+
+    for (const b of this.btns) {
+      button(ctx, b.rect, b.label, b.primary ? {} : { color: COLOR.bgPanel2, textColor: COLOR.text });
+      // Daily subline: modifier + best.
+      if (b.label.includes("DAILY")) {
+        const { modifier } = dailyFor();
+        const best = meta.daily && meta.daily.date === todayKey() ? `  ·  best ${meta.daily.bestWave}` : "";
+        text(ctx, `Today: ${modifier.name}${best}`, cx, b.rect.y + b.rect.h - 8, {
+          size: 10,
+          color: COLOR.textDim,
+          align: "center",
+        });
+      }
+    }
+
     if (meta.stats.wins > 0) {
-      text(ctx, `Wins: ${meta.stats.wins}   Best wave: ${meta.stats.bestWave}`, cx, height * 0.48 + 22, {
+      text(ctx, `Wins ${meta.stats.wins}  ·  Best wave ${meta.stats.bestWave}`, cx, height - 40, {
         size: 12,
         color: COLOR.textDim,
         align: "center",
       });
     }
-
-    button(ctx, this.playBtn, "▶  NEW RUN");
-    button(ctx, this.shopBtn, "◆  WORKSHOP", { color: COLOR.energy, textColor: "#05070a" });
-    text(ctx, "Prototype v0.3", cx, height - 24, { size: 12, color: COLOR.textDim, align: "center" });
+    text(ctx, "Prototype v0.4", cx, height - 20, { size: 11, color: COLOR.textDim, align: "center" });
   }
 }

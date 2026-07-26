@@ -24,6 +24,7 @@ export interface ChassisMods {
   damageMult?: number;
   fireRateMult?: number;
   rangeAdd?: number;
+  moveSpeedMult?: number;
 }
 
 export interface ResolvedWeapon {
@@ -111,6 +112,26 @@ export class Grid {
     return id;
   }
 
+  /** Cells a given powering cell emits to (respects core power patterns). */
+  private emitTargets(cell: Cell): Cell[] {
+    const d = this.def(cell);
+    const out: Cell[] = [];
+    const push = (x: number, y: number) => {
+      const n = this.at(x, y);
+      if (n && !n.locked) out.push(n);
+    };
+    if (d?.category === "core" && d.corePower === "cross") {
+      for (let x = 0; x < this.cols; x++) if (x !== cell.x) push(x, cell.y);
+      for (let y = 0; y < this.rows; y++) if (y !== cell.y) push(cell.x, y);
+    } else if (d?.category === "core" && d.corePower === "diagonal") {
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++) if (dx || dy) push(cell.x + dx, cell.y + dy);
+    } else {
+      for (const [dx, dy] of DIRS) push(cell.x + dx, cell.y + dy);
+    }
+    return out;
+  }
+
   /** Set of "x,y" keys for every powered cell. */
   computePowered(): Set<string> {
     const powered = new Set<string>();
@@ -123,9 +144,7 @@ export class Grid {
     }
     while (frontier.length) {
       const cur = frontier.pop()!;
-      for (const [dx, dy] of DIRS) {
-        const n = this.at(cur.x + dx, cur.y + dy);
-        if (!n || n.locked) continue;
+      for (const n of this.emitTargets(cur)) {
         const key = `${n.x},${n.y}`;
         if (powered.has(key)) continue;
         powered.add(key);

@@ -73,6 +73,8 @@ export interface ComponentDef {
   desc: string;
   weapon?: WeaponStats;
   support?: SupportMods;
+  /** Core power pattern (rule-changing). Default "neighbors" (4 orthogonal). */
+  corePower?: "neighbors" | "cross" | "diagonal";
   /** Weight in the reward draft pool (higher = more common). */
   weight: number;
   /** If true, must be unlocked in the Workshop before appearing in the pool. */
@@ -322,6 +324,63 @@ export const COMPONENTS: Record<string, ComponentDef> = {
     desc: "Adjacent weapons: +90 range and +15% damage.",
     support: { rangeAdd: 90, damageMult: 1.15 },
     weight: 3,
+  },
+
+  // ---- Legendaries (rule-changing, meta-gated) -------------------------
+  singularity_core: {
+    id: "singularity_core",
+    name: "Singularity Core",
+    category: "core",
+    rarity: "legendary",
+    element: "volt",
+    corePower: "cross",
+    desc: "Powers its ENTIRE row and column. Build long lines of weapons.",
+    weight: 1,
+    blueprint: true,
+  },
+  fusion_core: {
+    id: "fusion_core",
+    name: "Fusion Core",
+    category: "core",
+    rarity: "legendary",
+    element: "ember",
+    corePower: "diagonal",
+    desc: "Powers all 8 surrounding cells, including diagonals.",
+    weight: 1,
+    blueprint: true,
+  },
+  prism_lens: {
+    id: "prism_lens",
+    name: "Prism Lens",
+    category: "support",
+    rarity: "legendary",
+    element: "volt",
+    desc: "Adjacent weapons gain burn AND chill AND +15% crit at once.",
+    support: { burn: 6, slow: 0.4, critAdd: 0.15 },
+    weight: 1,
+    blueprint: true,
+  },
+  twin_loader: {
+    id: "twin_loader",
+    name: "Twin Loader",
+    category: "support",
+    rarity: "legendary",
+    element: "kinetic",
+    desc: "Adjacent weapons fire +2 projectiles and 20% faster.",
+    support: { projectilesAdd: 2, fireRateMult: 1.2 },
+    weight: 1,
+    blueprint: true,
+  },
+  siege_frame: {
+    id: "siege_frame",
+    name: "Siege Frame",
+    category: "weapon",
+    rarity: "legendary",
+    element: "ember",
+    desc: "Devastating piercing shells with a large explosion.",
+    weapon: W({ damage: 30, fireRate: 1.0, range: 400, aoe: 90, pierce: 3, crit: 0.15, projectileSpeed: 620 }),
+    weight: 1,
+    blueprint: true,
   },
 };
 

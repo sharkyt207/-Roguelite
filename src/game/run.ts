@@ -6,6 +6,7 @@
 import { Grid } from "./grid";
 import { CHASSIS } from "./chassis";
 import type { MetaSave } from "./meta";
+import type { DailyModifier } from "./daily";
 
 export interface WaveDef {
   duration: number;
@@ -36,7 +37,7 @@ export const WAVES: WaveDef[] = [
   {
     duration: 42,
     label: "Sector 3 · Wave 7",
-    spawns: [["rusher", 1.2], ["grunt", 0.6], ["spitter", 0.4], ["brood", 0.3], ["tank", 0.14]],
+    spawns: [["rusher", 1.0], ["grunt", 0.5], ["spitter", 0.35], ["brood", 0.25], ["tank", 0.12]],
   },
   {
     duration: 70,
@@ -54,16 +55,20 @@ export class RunState {
   waveIndex: number;
   inventory: string[];
   chassisId: string;
+  daily: boolean;
+  modifier?: DailyModifier;
 
-  constructor(meta: MetaSave) {
-    const chassis = CHASSIS[meta.selectedChassis] ?? CHASSIS.scrapheap;
+  constructor(meta: MetaSave, modifier?: DailyModifier, chassisId?: string) {
+    const chassis = CHASSIS[chassisId ?? meta.selectedChassis] ?? CHASSIS.scrapheap;
     this.chassisId = chassis.id;
+    this.daily = !!modifier;
+    this.modifier = modifier;
 
     // Expanded-Chassis upgrade unlocks the first N locked cells.
     const locked = chassis.locked.slice(meta.upgrades.reactor);
     this.grid = new Grid(chassis.cols, chassis.rows, locked, chassis.mods);
 
-    this.maxHp = chassis.baseHp + meta.upgrades.hull * 25;
+    this.maxHp = Math.round((chassis.baseHp + meta.upgrades.hull * 25) * (modifier?.hpMult ?? 1));
     this.hp = this.maxHp;
     this.salvage = meta.upgrades.magnet * 2;
     this.waveIndex = 0;

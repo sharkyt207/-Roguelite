@@ -96,7 +96,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     id: "reclaimer",
     name: "Reclaimer",
     color: "#ff9e3d",
-    hp: 680,
+    hp: 1200,
     speed: 50,
     radius: 44,
     contactDamage: 22,

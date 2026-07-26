@@ -179,7 +179,26 @@ Landschaft werden zu wanderndem Schrott. Du überlebst, indem du aus Salvage ein
 - **Portierung:** bei Bedarf später Godot/Unity; Datenmodell (Komponenten/Adjazenz) ist
   engine-unabhängig gehalten.
 
-## Prototyp-Status (v0.3 — lauffähig)
+## Prototyp-Status (v0.4 — lauffähig)
+
+**Balancing (datenbasiert):** Headless-Simulator `tools/balance-sim.ts` (`npm run sim`)
+nutzt die *echten* Auflösungs-/Daten-Module und berechnet Build-DPS, Wellen-Clear-Ratio
+und Boss-TTK gegen Ziel-Bänder. Reclaimer-HP & Welle 7 auf Basis der Ergebnisse getunt
+(Boss-TTK jetzt 12–25 s, Clear-Ratios im Zielband).
+
+**Build-Identität – Legendaries mit regelverändernden Effekten:** Singularity Core
+(versorgt ganze Reihe+Spalte), Fusion Core (8er-Umkreis inkl. Diagonalen), Prism Lens
+(Burn+Chill+Crit zugleich), Twin Loader (+2 Projektile), Siege Frame. Zwei neue Chassis:
+Sentinel (+Reichweite), Nomad (+30% Tempo). Kern-Power-Muster (`corePower`) im Grid-Modell.
+
+**Persistenz & Politur:** Laufender Run wird gespeichert (localStorage) → **CONTINUE**
+im Title. **Pause-Menü** im Kampf (Resume/Abandon). Scrollbare **Enzyklopädie** aller
+Teile & Gegner. Chassis zeigt jetzt echte **Waffen-Silhouetten** (Läufe je Element).
+
+**Daily Run:** deterministischer Tages-Seed + rotierender Modifier (Swarm, Glass Cannon,
+Inferno, Supercharge, Elite, Blitz) über unseren seedbaren RNG; Daily-Bestwert gespeichert.
+
+### Frühere Meilensteine (v0.3)
 
 **Content & Bosse:** 8 Wellen über 3 Sektoren mit **3 Bossen** und echter KI:
 *Reclaimer* (beschwört Adds), *Harvester* (telegrafierte Radial-Bullet-Bursts),

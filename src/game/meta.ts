@@ -28,6 +28,7 @@ export interface MetaSave {
   unlockedBlueprints: string[];
   muted: boolean;
   seenTutorial: boolean;
+  daily: { date: string; bestWave: number; won: boolean } | null;
   stats: { runs: number; wins: number; bestWave: number };
 }
 
@@ -62,6 +63,11 @@ export const BLUEPRINTS: Array<{ id: string; cost: number }> = [
   { id: "catalyst", cost: 10 },
   { id: "splitter", cost: 10 },
   { id: "flamethrower", cost: 12 },
+  { id: "singularity_core", cost: 22 },
+  { id: "fusion_core", cost: 20 },
+  { id: "prism_lens", cost: 24 },
+  { id: "twin_loader", cost: 22 },
+  { id: "siege_frame", cost: 24 },
 ];
 
 export function defaultSave(): MetaSave {
@@ -73,6 +79,7 @@ export function defaultSave(): MetaSave {
     unlockedBlueprints: [],
     muted: false,
     seenTutorial: false,
+    daily: null,
     stats: { runs: 0, wins: 0, bestWave: 0 },
   };
 }

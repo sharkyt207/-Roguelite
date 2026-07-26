@@ -15,8 +15,8 @@ export interface ChassisDef {
   start: Array<[number, number, string]>;
   startInventory: string[];
   baseHp: number;
-  /** Flat multipliers applied to every resolved weapon. */
-  mods: { damageMult?: number; fireRateMult?: number; rangeAdd?: number };
+  /** Flat multipliers applied to every resolved weapon + movement. */
+  mods: { damageMult?: number; fireRateMult?: number; rangeAdd?: number; moveSpeedMult?: number };
   desc: string;
   cost: number; // meta cost to unlock (0 = starter)
 }
@@ -89,6 +89,49 @@ export const CHASSIS: Record<string, ChassisDef> = {
     mods: { damageMult: 1.1, fireRateMult: 0.92 },
     desc: "Heavy frame: +50 integrity, +10% damage, slightly slower fire.",
     cost: 16,
+  },
+  sentinel: {
+    id: "sentinel",
+    name: "Sentinel",
+    cols: 5,
+    rows: 5,
+    locked: [
+      [0, 0],
+      [4, 0],
+      [0, 4],
+      [4, 4],
+    ],
+    start: [
+      [2, 2, "reactor_core"],
+      [2, 1, "rivet_gun"],
+      [3, 2, "targeting_chip"],
+    ],
+    startInventory: ["conduit", "focus_array"],
+    baseHp: 110,
+    mods: { rangeAdd: 70 },
+    desc: "Long-range specialist: +70 weapon range. Pick off enemies early.",
+    cost: 20,
+  },
+  nomad: {
+    id: "nomad",
+    name: "Nomad",
+    cols: 5,
+    rows: 5,
+    locked: [
+      [0, 0],
+      [4, 0],
+      [0, 4],
+      [4, 4],
+    ],
+    start: [
+      [2, 2, "reactor_core"],
+      [2, 1, "flak_pod"],
+    ],
+    startInventory: ["rivet_gun", "conduit", "targeting_chip"],
+    baseHp: 90,
+    mods: { moveSpeedMult: 1.3 },
+    desc: "Hit-and-run: +30% movement speed, lighter frame. Kiting is king.",
+    cost: 22,
   },
 };
 

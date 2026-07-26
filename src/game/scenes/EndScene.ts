@@ -8,6 +8,7 @@ import { COLOR } from "../../core/theme";
 import { button, pointInRect, text, type Rect } from "../../ui/draw";
 import { TitleScene } from "./TitleScene";
 import { WorkshopScene } from "./WorkshopScene";
+import { todayKey } from "../daily";
 
 export class EndScene implements Scene {
   private titleBtn: Rect = { x: 0, y: 0, w: 0, h: 0 };
@@ -23,7 +24,18 @@ export class EndScene implements Scene {
     game.meta.cores += this.coresEarned;
     game.meta.stats.runs += 1;
     if (won) game.meta.stats.wins += 1;
+
+    if (run.daily) {
+      const key = todayKey();
+      const prev = game.meta.daily && game.meta.daily.date === key ? game.meta.daily : null;
+      game.meta.daily = {
+        date: key,
+        bestWave: Math.max(prev?.bestWave ?? 0, run.waveIndex + (won ? 1 : 0)),
+        won: (prev?.won ?? false) || won,
+      };
+    }
     game.saveMeta();
+    game.endRun(); // clear the in-progress save
     game.audio.play(won ? "win" : "lose");
   }
 
